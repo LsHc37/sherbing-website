@@ -10,18 +10,26 @@ type User = {
   phone: string;
   role: 'customer' | 'employee' | 'admin';
   active: string;
+  available_dates?: string;
 };
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [availabilityDrafts, setAvailabilityDrafts] = useState<Record<string, string[]>>({});
+  const [availabilityInputs, setAvailabilityInputs] = useState<Record<string, string>>({});
   const [inviteData, setInviteData] = useState({
     full_name: '',
     email: '',
     phone: '',
     role: 'employee',
   });
+
+  const parseAvailabilityDates = (value?: string) => {
+    if (!value) return [] as string[];
+    return Array.from(new Set(value.split(',').map((v) => v.trim()).filter(Boolean))).sort();
+  };
 
   const load = async () => {
     setLoading(true);
@@ -47,7 +55,15 @@ export default function AdminUsersPage() {
       return;
     }
 
-    setUsers(await response.json());
+    const loadedUsers = await response.json();
+    setUsers(loadedUsers);
+
+    const nextDrafts: Record<string, string[]> = {};
+    for (const user of loadedUsers as User[]) {
+      nextDrafts[user.email] = parseAvailabilityDates(user.available_dates);
+    }
+    setAvailabilityDrafts(nextDrafts);
+
     setLoading(false);
   };
 
@@ -59,21 +75,67 @@ export default function AdminUsersPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  const setRole = async (email: string, role: User['role']) => {
+  const updateUser = async (email: string, payload: { role?: User['role']; active?: string; available_dates?: string }) => {
     const response = await fetch(`/api/users/${encodeURIComponent(email)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
       const data = await response.json();
-      setMessage(data.error || 'Role update failed');
+      setMessage(data.error || 'User update failed');
       return;
     }
 
-    setMessage(`Updated ${email} to ${role}`);
+    setMessage(`Updated ${email}`);
     await load();
+  };
+
+  const setRole = async (email: string, role: User['role']) => {
+    await updateUser(email, { role });
+  };
+
+  const setAvailability = async (email: string, available_dates: string) => {
+    await updateUser(email, { available_dates });
+  };
+
+  const addAvailabilityDate = (email: string) => {
+    const dateToAdd = (availabilityInputs[email] || '').trim();
+    if (!dateToAdd) return;
+
+    setAvailabilityDrafts((prev) => {
+      const existing = prev[email] || [];
+      if (existing.includes(dateToAdd)) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [email]: [...existing, dateToAdd].sort(),
+      };
+    });
+
+    setAvailabilityInputs((prev) => ({
+      ...prev,
+      [email]: '',
+    }));
+  };
+
+  const removeAvailabilityDate = (email: string, dateToRemove: string) => {
+    setAvailabilityDrafts((prev) => ({
+      ...prev,
+      [email]: (prev[email] || []).filter((date) => date !== dateToRemove),
+    }));
+  };
+
+  const saveAvailabilityDates = async (email: string) => {
+    const dates = availabilityDrafts[email] || [];
+    await setAvailability(email, dates.join(','));
+  };
+
+  const setActive = async (email: string, active: string) => {
+    await updateUser(email, { active });
   };
 
   const inviteEmployee = async (e: React.FormEvent) => {
@@ -105,7 +167,10 @@ export default function AdminUsersPage() {
             <h1 className="text-2xl font-bold text-green-600">Admin User Management</h1>
             <p className="text-sm text-gray-500">Invite staff and manage roles</p>
           </div>
-          <Link href="/employee/dashboard" className="text-gray-700 hover:text-gray-900">Back to Dashboard</Link>
+          <div className="flex items-center gap-4">
+            <Link href="/admin/bookings" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>
+            <Link href="/employee/dashboard" className="text-gray-700 hover:text-gray-900">Back to Dashboard</Link>
+          </div>
         </div>
       </header>
 
@@ -156,6 +221,8 @@ export default function AdminUsersPage() {
                 <th className="px-4 py-3 text-left text-sm">Email</th>
                 <th className="px-4 py-3 text-left text-sm">Phone</th>
                 <th className="px-4 py-3 text-left text-sm">Role</th>
+                <th className="px-4 py-3 text-left text-sm">Active</th>
+                <th className="px-4 py-3 text-left text-sm">Available Dates</th>
                 <th className="px-4 py-3 text-left text-sm">Actions</th>
               </tr>
             </thead>
@@ -166,6 +233,61 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3 text-sm">{user.email}</td>
                   <td className="px-4 py-3 text-sm">{user.phone || '-'}</td>
                   <td className="px-4 py-3 text-sm font-semibold">{user.role}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <select
+                      value={String(user.active || 'true')}
+                      onChange={(e) => void setActive(user.email, e.target.value)}
+                      className="px-2 py-1 border rounded"
+                    >
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="min-w-72 space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="date"
+                          value={availabilityInputs[user.email] || ''}
+                          onChange={(e) => setAvailabilityInputs((prev) => ({
+                            ...prev,
+                            [user.email]: e.target.value,
+                          }))}
+                          className="px-2 py-1 border rounded"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addAvailabilityDate(user.email)}
+                          className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded"
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void saveAvailabilityDates(user.email)}
+                          className="px-2 py-1 bg-emerald-600 text-white rounded"
+                        >
+                          Save
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {(availabilityDrafts[user.email] || []).length === 0 && (
+                          <span className="text-xs text-gray-500">No dates selected</span>
+                        )}
+                        {(availabilityDrafts[user.email] || []).map((date) => (
+                          <button
+                            key={date}
+                            type="button"
+                            onClick={() => removeAvailabilityDate(user.email, date)}
+                            className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"
+                            title="Remove date"
+                          >
+                            {date} ×
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex flex-wrap gap-2">
                       <button onClick={() => setRole(user.email, 'customer')} className="px-2 py-1 bg-gray-100 rounded">Customer</button>
