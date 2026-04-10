@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import Logo from '@/app/components/Logo';
 
 export default function AboutPage() {
@@ -88,6 +89,67 @@ export default function AboutPage() {
             <div>
               <p className="text-3xl font-bold text-emerald-700">04</p>
               <p className="text-slate-700 mt-2">Track your request and get service delivered by trusted teams.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section-container pb-12">
+        <div className="surface-card p-8 sm:p-10 appear-up stagger-3">
+          <div className="grid gap-8 lg:grid-cols-[320px_minmax(0,1fr)] items-start">
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-slate-100 aspect-[4/5]">
+              <Image
+                src="/photo.jpg"
+                alt="Lucas Mellen, Founder and CEO of Sherbing"
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 320px"
+                className="object-cover"
+              />
+            </div>
+
+            <div>
+              <p className="inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold tracking-wide bg-emerald-50 border border-emerald-200 text-emerald-800 mb-4">
+                Meet the Founder
+              </p>
+              <h2 className="text-3xl font-bold text-slate-900 mb-4">About Me</h2>
+              <p className="text-xl font-semibold text-slate-900">Lucas Mellen</p>
+              <p className="text-emerald-700 font-medium mb-5">Founder &amp; CEO, Sherbing</p>
+              <p className="text-slate-700 leading-relaxed mb-4">
+                I&apos;m Lucas Mellen, Founder &amp; CEO of Sherbing. I&apos;m 17 years old and based in Boise,
+                Idaho. I started Sherbing to build something useful for real families and homeowners,
+                and to make everyday outdoor services feel easier and less stressful.
+              </p>
+              <p className="text-slate-700 leading-relaxed mb-4">
+                I&apos;m also the founder and CEO of Retrogigz, a tech company that supports the other
+                businesses I&apos;m building. A big part of why I do this work is that I love helping
+                people, especially kids, and creating opportunities that make life better.
+              </p>
+              <p className="text-slate-700 leading-relaxed">
+                Outside of work, I enjoy working out and spending time with my girlfriend. My biggest
+                life goal is simple: build a happy, healthy family while creating companies that do
+                meaningful work.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Based In</p>
+                  <p className="text-sm font-semibold text-slate-900">Boise, Idaho</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Also Building</p>
+                  <p className="text-sm font-semibold text-slate-900">Retrogigz</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Core Focus</p>
+                  <p className="text-sm font-semibold text-slate-900">Helping People</p>
+                </div>
+              </div>
+
+              <blockquote className="mt-6 rounded-2xl border-l-4 border-emerald-500 bg-emerald-50/70 px-5 py-4 text-slate-700 italic">
+                "I want to build companies that solve real problems and create a better life for the
+                people around me."
+              </blockquote>
             </div>
           </div>
         </div>
