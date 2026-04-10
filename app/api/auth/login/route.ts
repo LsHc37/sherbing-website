@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSessionToken, getSessionCookieName, getSessionCookieSettings, getSessionMaxAgeSeconds, hashPassword } from '@/lib/auth/session';
-import { findUserByEmail } from '@/lib/services/googleSheetsService';
+import { findUserByEmail, updateUserInSheet } from '@/lib/services/googleSheetsService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,10 +34,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
     }
 
+    const adminEmails = new Set(['lucas.mellen1@gmail.com', 'lucanmellen1@gmail.com']);
+    const resolvedRole = adminEmails.has(normalizedEmail) ? 'admin' : user.role;
+
+    if (resolvedRole === 'admin' && user.role !== 'admin') {
+      await updateUserInSheet(normalizedEmail, { role: 'admin' });
+    }
+
     const token = createSessionToken({
       email: user.email,
       full_name: user.full_name,
-      role: user.role,
+      role: resolvedRole,
     });
 
     const response = NextResponse.json(
@@ -46,7 +53,7 @@ export async function POST(request: NextRequest) {
         user: {
           email: user.email,
           full_name: user.full_name,
-          role: user.role,
+          role: resolvedRole,
           phone: user.phone,
         },
         message: 'Login successful',

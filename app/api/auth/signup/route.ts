@@ -16,7 +16,8 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
-    const role = normalizedEmail === 'lucanmellen1@gmail.com' ? 'admin' : 'customer';
+    const adminEmails = new Set(['lucas.mellen1@gmail.com', 'lucanmellen1@gmail.com']);
+    const role = adminEmails.has(normalizedEmail) ? 'admin' : 'customer';
 
     // Generate verification code for email
     const verificationCode = generateVerificationCode();

@@ -19,10 +19,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
+  const adminEmails = new Set(['lucas.mellen1@gmail.com', 'lucanmellen1@gmail.com']);
+  const resolvedRole = adminEmails.has(user.email.toLowerCase()) ? 'admin' : user.role;
+
   const refreshedToken = createSessionToken({
     email: user.email,
     full_name: user.full_name,
-    role: user.role,
+    role: resolvedRole,
   });
 
   const response = NextResponse.json({
@@ -30,7 +33,7 @@ export async function GET(request: NextRequest) {
     user: {
       email: user.email,
       full_name: user.full_name,
-      role: user.role,
+      role: resolvedRole,
       phone: user.phone,
     },
   });
