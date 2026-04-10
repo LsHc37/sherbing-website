@@ -136,7 +136,15 @@ export default function EmployeeDashboardPage() {
         body: JSON.stringify({ status }),
       });
 
-      const body = await response.json();
+      const raw = await response.text();
+      let body: { error?: string } = {};
+      if (raw) {
+        try {
+          body = JSON.parse(raw) as { error?: string };
+        } catch {
+          body = {};
+        }
+      }
       if (!response.ok) {
         throw new Error(body?.error || 'Failed to update booking');
       }
@@ -169,6 +177,7 @@ export default function EmployeeDashboardPage() {
           </div>
           <div className="flex items-center gap-4 text-sm sm:text-base">
             {user?.role === 'admin' && <Link href="/admin/users" className="text-gray-700 hover:text-gray-900">Manage Users</Link>}
+            {user?.role === 'admin' && <Link href="/admin/bookings" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>}
             <button onClick={logout} className="text-gray-700 hover:text-gray-900">Logout</button>
           </div>
         </nav>
@@ -228,9 +237,33 @@ export default function EmployeeDashboardPage() {
                           )}
                         </div>
 
+                        <p className="text-xs text-gray-500">
+                          Booking ID: {booking.id} | Created: {new Date(booking.created_at).toLocaleString()}
+                        </p>
+
                         <p className="text-gray-700">
                           {booking.address}, {booking.city}, {booking.state} {booking.zip_code}
                         </p>
+                        <div className="flex flex-wrap gap-2">
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${booking.address}, ${booking.city}, ${booking.state} ${booking.zip_code}`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded"
+                          >
+                            Open Map
+                          </a>
+                          {booking.customer_phone && (
+                            <a href={`tel:${booking.customer_phone}`} className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">
+                              Call Customer
+                            </a>
+                          )}
+                          {booking.customer_email && (
+                            <a href={`mailto:${booking.customer_email}`} className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded">
+                              Email Customer
+                            </a>
+                          )}
+                        </div>
                         {(booking.scheduled_date || booking.scheduled_time) && (
                           <p className="text-sm text-gray-600">
                             Scheduled: {booking.scheduled_date || 'TBD'} {booking.scheduled_time || ''}
@@ -238,6 +271,9 @@ export default function EmployeeDashboardPage() {
                         )}
                         <p className="text-sm text-gray-500">
                           Customer: {booking.customer_name} {booking.customer_email ? `(${booking.customer_email})` : ''}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Assigned Employee: {booking.assigned_employee || 'Unassigned'}
                         </p>
                         {booking.customer_phone && <p className="text-sm text-gray-500">Phone: {booking.customer_phone}</p>}
                         {booking.customer_update_request && (
