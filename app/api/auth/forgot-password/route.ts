@@ -7,6 +7,29 @@ function generateResetToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function getBaseUrl(request: NextRequest): string {
+  const envUrl = process.env.APP_URL?.trim();
+  if (envUrl) {
+    return envUrl.replace(/\/+$/, '');
+  }
+
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const host = request.headers.get('host');
+
+  if (forwardedHost) {
+    const protocol = forwardedProto || 'https';
+    return `${protocol}://${forwardedHost}`.replace(/\/+$/, '');
+  }
+
+  if (host) {
+    const protocol = host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https';
+    return `${protocol}://${host}`.replace(/\/+$/, '');
+  }
+
+  return 'http://localhost:3000';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -50,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send reset email
-    const resetLink = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    const resetLink = `${getBaseUrl(request)}/reset-password?token=${resetToken}`;
     const emailResult = await sendPasswordResetEmail(normalizedEmail, user.full_name, resetLink);
 
     if (!emailResult.success) {
