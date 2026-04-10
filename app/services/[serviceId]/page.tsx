@@ -27,8 +27,13 @@ export function generateStaticParams() {
   return getServices().map((service) => ({ serviceId: service.id }));
 }
 
-export default function ServicePage({ params }: { params: { serviceId: string } }) {
-  const service = getServices().find((item) => item.id === params.serviceId);
+export default async function ServicePage({
+  params,
+}: {
+  params: Promise<{ serviceId: string }>;
+}) {
+  const { serviceId } = await params;
+  const service = getServices().find((item) => item.id === serviceId);
 
   if (!service) {
     notFound();
