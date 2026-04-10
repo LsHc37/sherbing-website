@@ -43,6 +43,7 @@ type UserSheetRow = {
   email_verification_expires?: string;
   password_reset_token?: string;
   password_reset_expires?: string;
+  available_dates?: string;
 };
 
 const authConfig: JWTInput = {
@@ -229,6 +230,7 @@ export async function initializeSheet() {
     'Email Verification Expires',
     'Password Reset Token',
     'Password Reset Expires',
+    'Available Dates',
   ];
 
   const bookingInit = await ensureHeaders(bookingsTabName(), bookingHeaders);
@@ -241,8 +243,20 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
   if (rows.length < 2) return [];
   const headers = rows[0];
   const idx = (name: string) => headers.indexOf(name);
+  const idxAny = (names: string[]) => {
+    for (const name of names) {
+      const index = idx(name);
+      if (index >= 0) return index;
+    }
+    return -1;
+  };
   const get = (row: string[], name: string) => {
     const index = idx(name);
+    if (index < 0) return '';
+    return row[index] || '';
+  };
+  const getAny = (row: string[], names: string[]) => {
+    const index = idxAny(names);
     if (index < 0) return '';
     return row[index] || '';
   };
@@ -256,29 +270,29 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
     const cityStateZip = get(row, 'City/State/ZIP') || [city, state, zipCode].filter(Boolean).join(', ');
     return {
       timestamp: get(row, 'Timestamp'),
-      booking_id: get(row, 'Booking ID'),
-      customer_name: get(row, 'Customer Name'),
-      customer_email: get(row, 'Email'),
-      customer_phone: get(row, 'Phone'),
-      address: get(row, 'Address'),
+      booking_id: getAny(row, ['Booking ID', 'booking_id', 'BookingId', 'ID']),
+      customer_name: getAny(row, ['Customer Name', 'customer_name', 'Name']),
+      customer_email: getAny(row, ['Email', 'customer_email']),
+      customer_phone: getAny(row, ['Phone', 'customer_phone']),
+      address: getAny(row, ['Address', 'address']),
       city_state_zip: cityStateZip,
       city,
       state,
       zip_code: zipCode,
-      service: get(row, 'Service'),
-      property_sqft: get(row, 'Property Size (sqft)'),
-      yard_sqft: get(row, 'Yard Size (sqft)'),
-      scheduled_date: get(row, 'Scheduled Date'),
-      scheduled_time: get(row, 'Scheduled Time'),
-      estimated_price: get(row, 'Estimated Price') || '0',
-      customer_price: get(row, 'Customer Price') || String(payout.customerPrice),
-      sherbing_fee: get(row, 'Sherbing Fee') || String(payout.sherbingFee),
-      employee_payout: get(row, 'Employee Payout') || String(payout.employeePayout),
-      package: get(row, 'Package'),
-      notes: get(row, 'Notes'),
-      status: get(row, 'Status') || 'pending',
-      assigned_employee: get(row, 'Assigned Employee'),
-      customer_update_request: get(row, 'Customer Update Request'),
+      service: getAny(row, ['Service', 'service_id', 'service']),
+      property_sqft: getAny(row, ['Property Size (sqft)', 'property_sqft']),
+      yard_sqft: getAny(row, ['Yard Size (sqft)', 'yard_sqft']),
+      scheduled_date: getAny(row, ['Scheduled Date', 'scheduled_date']),
+      scheduled_time: getAny(row, ['Scheduled Time', 'scheduled_time']),
+      estimated_price: getAny(row, ['Estimated Price', 'estimated_price']) || '0',
+      customer_price: getAny(row, ['Customer Price', 'customer_price']) || String(payout.customerPrice),
+      sherbing_fee: getAny(row, ['Sherbing Fee', 'sherbing_fee']) || String(payout.sherbingFee),
+      employee_payout: getAny(row, ['Employee Payout', 'employee_payout']) || String(payout.employeePayout),
+      package: getAny(row, ['Package', 'package_id']),
+      notes: getAny(row, ['Notes', 'notes']),
+      status: getAny(row, ['Status', 'status']) || 'pending',
+      assigned_employee: getAny(row, ['Assigned Employee', 'assigned_employee']),
+      customer_update_request: getAny(row, ['Customer Update Request', 'customer_update_request']),
     };
   });
 }
@@ -308,6 +322,7 @@ function parseUserRows(rows: string[][]): UserSheetRow[] {
     email_verification_expires: get(row, 'Email Verification Expires'),
     password_reset_token: get(row, 'Password Reset Token'),
     password_reset_expires: get(row, 'Password Reset Expires'),
+    available_dates: get(row, 'Available Dates'),
   }));
 }
 
@@ -392,7 +407,7 @@ export async function findBookingById(bookingId: string) {
 
 export async function updateBookingInSheet(
   bookingId: string,
-  updates: Partial<Pick<BookingSheetRow, 'status' | 'assigned_employee' | 'customer_update_request' | 'notes'>>
+  updates: Partial<Pick<BookingSheetRow, 'status' | 'assigned_employee' | 'customer_update_request' | 'notes' | 'scheduled_date' | 'scheduled_time'>>
 ) {
   const client = await getSheetsClient();
   if (!client) return { success: false, error: 'Google Sheets not configured' };
@@ -402,7 +417,17 @@ export async function updateBookingInSheet(
   if (rows.length < 2) return { success: false, error: 'No bookings found' };
 
   const headers = rows[0];
-  const bookingIndex = rows.findIndex((r, i) => i > 0 && (r[headers.indexOf('Booking ID')] || '') === bookingId);
+  const bookingIdHeaderIndexCandidates = ['Booking ID', 'booking_id', 'BookingId', 'ID']
+    .map((name) => headers.indexOf(name))
+    .filter((index) => index >= 0);
+
+  if (bookingIdHeaderIndexCandidates.length === 0) {
+    return { success: false, error: 'Booking ID column not found' };
+  }
+
+  const bookingIndex = rows.findIndex((r, i) =>
+    i > 0 && bookingIdHeaderIndexCandidates.some((columnIndex) => (r[columnIndex] || '') === bookingId)
+  );
   if (bookingIndex === -1) return { success: false, error: 'Booking not found' };
 
   const row = rows[bookingIndex];
@@ -414,6 +439,8 @@ export async function updateBookingInSheet(
 
   set('Status', updates.status);
   set('Assigned Employee', updates.assigned_employee);
+  set('Scheduled Date', updates.scheduled_date);
+  set('Scheduled Time', updates.scheduled_time);
   set('Customer Update Request', updates.customer_update_request);
   set('Notes', updates.notes);
 
@@ -437,7 +464,7 @@ export async function findUserByEmail(email: string) {
 
 export async function updateUserInSheet(
   email: string,
-  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires' | 'password_reset_token' | 'password_reset_expires'>> & { email_verified?: string | boolean }
+  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires' | 'password_reset_token' | 'password_reset_expires' | 'available_dates'>> & { email_verified?: string | boolean }
 ) {
   const client = await getSheetsClient();
   if (!client) return { success: false, error: 'Google Sheets not configured' };
@@ -470,6 +497,7 @@ export async function updateUserInSheet(
   set('Email Verification Expires', updates.email_verification_expires);
   set('Password Reset Token', updates.password_reset_token);
   set('Password Reset Expires', updates.password_reset_expires);
+  set('Available Dates', updates.available_dates);
 
   const endColumn = columnNumberToName(headers.length);
   const range = `${usersTabName()}!A${rowIndex + 1}:${endColumn}${rowIndex + 1}`;
@@ -524,6 +552,7 @@ export async function createUserInSheet(user: {
         user.email_verification_expires || '',
         '', // Password Reset Token
         '', // Password Reset Expires
+        '', // Available Dates
       ]],
     },
   }));

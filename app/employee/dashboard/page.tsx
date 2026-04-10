@@ -60,6 +60,14 @@ function getStatusClass(status: string): string {
   }
 }
 
+function formatAddress(booking: Booking): string {
+  const partOne = booking.address?.trim() || '';
+  const partTwo = [booking.city, booking.state].map((value) => value?.trim()).filter(Boolean).join(', ');
+  const zip = booking.zip_code?.trim() || '';
+
+  return [partOne, [partTwo, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+}
+
 export default function EmployeeDashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -241,12 +249,10 @@ export default function EmployeeDashboardPage() {
                           Booking ID: {booking.id} | Created: {new Date(booking.created_at).toLocaleString()}
                         </p>
 
-                        <p className="text-gray-700">
-                          {booking.address}, {booking.city}, {booking.state} {booking.zip_code}
-                        </p>
+                        <p className="text-gray-700">{formatAddress(booking) || 'Address unavailable'}</p>
                         <div className="flex flex-wrap gap-2">
                           <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${booking.address}, ${booking.city}, ${booking.state} ${booking.zip_code}`)}`}
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatAddress(booking) || booking.address || '')}`}
                             target="_blank"
                             rel="noreferrer"
                             className="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded"

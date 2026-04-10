@@ -168,7 +168,7 @@ export default function AdminUsersPage() {
             <p className="text-sm text-gray-500">Invite staff and manage roles</p>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/admin/bookings" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>
+            <Link href="/admin/booking" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>
             <Link href="/employee/dashboard" className="text-gray-700 hover:text-gray-900">Back to Dashboard</Link>
           </div>
         </div>
