@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getServices } from '@/lib/services/pricingService';
+import { SERVICE_DETAILS } from '@/lib/services/serviceDetails';
 
 const serviceIcons: Record<string, string> = {
   lawn_mowing: '🌿',
@@ -34,6 +35,7 @@ export default function ServicePage({ params }: { params: { serviceId: string } 
   }
 
   const icon = serviceIcons[service.id] || '🏡';
+  const details = SERVICE_DETAILS[service.id];
 
   return (
     <main className="page-shell min-h-screen py-12 px-4 sm:px-6 lg:px-8">
@@ -58,7 +60,9 @@ export default function ServicePage({ params }: { params: { serviceId: string } 
             </div>
           </div>
 
-          <p className="text-lg text-slate-700 leading-relaxed mb-6">{service.description}</p>
+          <p className="text-lg text-slate-700 leading-relaxed mb-6">
+            {details?.fullDescription || service.description}
+          </p>
 
           {service.rating && (
             <div className="flex items-center gap-2 mb-6">
@@ -82,47 +86,83 @@ export default function ServicePage({ params }: { params: { serviceId: string } 
           </div>
         </div>
 
+        {/* Benefits Section */}
         <div className="surface-card p-8 sm:p-12 mb-8 appear-up stagger-1">
-          <h2 className="text-3xl font-bold text-slate-900 mb-6">What You Get</h2>
-          <p className="text-slate-700 leading-relaxed">
-            This service page gives you a quick overview of what the service covers, the starting price, and the next step to book it right away.
-          </p>
-          <ul className="mt-6 space-y-3">
-            <li className="flex items-start gap-3">
-              <span className="text-green-600 text-xl mt-0.5">✓</span>
-              <span className="text-slate-700">Professional and experienced team</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-green-600 text-xl mt-0.5">✓</span>
-              <span className="text-slate-700">Fast and reliable service in the Boise area</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-green-600 text-xl mt-0.5">✓</span>
-              <span className="text-slate-700">Transparent pricing with no hidden fees</span>
-            </li>
-          </ul>
+          <h2 className="text-3xl font-bold text-slate-900 mb-6">Benefits of {service.name}</h2>
+          {details && details.benefits.length > 0 ? (
+            <ul className="space-y-3">
+              {details.benefits.map((benefit, index) => (
+                <li key={index} className="flex items-start gap-3">
+                  <span className="text-green-600 text-xl mt-0.5 flex-shrink-0">✓</span>
+                  <span className="text-slate-700">{benefit}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="mt-6 space-y-3">
+              <li className="flex items-start gap-3">
+                <span className="text-green-600 text-xl mt-0.5">✓</span>
+                <span className="text-slate-700">Professional and experienced team</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-green-600 text-xl mt-0.5">✓</span>
+                <span className="text-slate-700">Fast and reliable service in the Boise area</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-green-600 text-xl mt-0.5">✓</span>
+                <span className="text-slate-700">Transparent pricing with no hidden fees</span>
+              </li>
+            </ul>
+          )}
         </div>
 
+        {/* Process Section */}
         <div className="surface-card p-8 sm:p-12 mb-8 appear-up stagger-2">
-          <h2 className="text-3xl font-bold text-slate-900 mb-6">How It Works</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-emerald-700 mb-2">1</div>
-              <h3 className="font-semibold text-slate-900 mb-2">Review Service</h3>
-              <p className="text-sm text-slate-600">Read the service details and pricing.</p>
+          <h2 className="text-3xl font-bold text-slate-900 mb-6">How Our Process Works</h2>
+          {details && details.process.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {details.process.map((step, index) => (
+                <div key={index} className="text-center sm:text-left">
+                  <div className="text-4xl font-bold text-emerald-700 mb-3">{index + 1}</div>
+                  <p className="text-sm text-slate-700">{step}</p>
+                </div>
+              ))}
             </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-emerald-700 mb-2">2</div>
-              <h3 className="font-semibold text-slate-900 mb-2">Book It</h3>
-              <p className="text-sm text-slate-600">Jump to booking with this service already selected.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div className="text-center">
+                <div className="text-4xl font-bold text-emerald-700 mb-2">1</div>
+                <h3 className="font-semibold text-slate-900 mb-2">Review Service</h3>
+                <p className="text-sm text-slate-600">Read the service details and pricing.</p>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-emerald-700 mb-2">2</div>
+                <h3 className="font-semibold text-slate-900 mb-2">Book It</h3>
+                <p className="text-sm text-slate-600">Jump to booking with this service already selected.</p>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-emerald-700 mb-2">3</div>
+                <h3 className="font-semibold text-slate-900 mb-2">Get It Done</h3>
+                <p className="text-sm text-slate-600">We handle the rest after submission.</p>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-emerald-700 mb-2">3</div>
-              <h3 className="font-semibold text-slate-900 mb-2">Get It Done</h3>
-              <p className="text-sm text-slate-600">We handle the rest after submission.</p>
+          )}
+        </div>
+
+        {/* FAQs Section */}
+        {details && details.faqs.length > 0 && (
+          <div className="surface-card p-8 sm:p-12 mb-8 appear-up stagger-2">
+            <h2 className="text-3xl font-bold text-slate-900 mb-6">Frequently Asked Questions</h2>
+            <div className="space-y-6">
+              {details.faqs.map((faq, index) => (
+                <div key={index} className="border-b border-slate-200 pb-6 last:border-b-0 last:pb-0">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">{faq.question}</h3>
+                  <p className="text-slate-700 leading-relaxed">{faq.answer}</p>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        )}
 
         <div className="rounded-3xl border border-emerald-300 bg-gradient-to-r from-emerald-700 via-emerald-800 to-slate-900 text-white px-8 py-12 sm:px-12 sm:py-16 text-center appear-up stagger-3">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">Ready to book {service.name.toLowerCase()}?</h2>

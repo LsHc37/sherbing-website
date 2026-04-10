@@ -80,6 +80,31 @@ export async function sendVerificationEmail(
   });
 }
 
+export async function sendPasswordResetEmail(
+  email: string,
+  fullName: string,
+  resetLink: string
+): Promise<{ success: boolean; error?: string }> {
+  return sendMail({
+    to: email,
+    subject: 'Reset Your Sherbing Password',
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+        <h2 style="margin: 0 0 16px;">Password Reset Request</h2>
+        <p>Hi ${fullName},</p>
+        <p>We received a request to reset your Sherbing password. Click the link below to create a new password:</p>
+        <p style="margin: 20px 0;">
+          <a href="${resetLink}" style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Reset Password</a>
+        </p>
+        <p style="color: #6b7280; font-size: 12px;">This link expires in 1 hour. If you didn't request a password reset, you can safely ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+        <p style="color: #6b7280; font-size: 12px;">Or copy and paste this link in your browser: <a href="${resetLink}" style="color: #16a34a;">${resetLink}</a></p>
+      </div>
+    `,
+    text: `Password Reset Request\n\nHi ${fullName},\n\nWe received a request to reset your Sherbing password. Visit this link to create a new password:\n\n${resetLink}\n\nThis link expires in 1 hour. If you didn't request a password reset, you can safely ignore this email.`,
+  });
+}
+
 export async function sendBookingConfirmation(
   email: string,
   fullName: string,

@@ -41,6 +41,8 @@ type UserSheetRow = {
   email_verified: string;
   email_verification_code?: string;
   email_verification_expires?: string;
+  password_reset_token?: string;
+  password_reset_expires?: string;
 };
 
 const authConfig: JWTInput = {
@@ -302,6 +304,8 @@ function parseUserRows(rows: string[][]): UserSheetRow[] {
     email_verified: isTruthy(get(row, 'Email Verified')) ? 'true' : 'false',
     email_verification_code: get(row, 'Email Verification Code'),
     email_verification_expires: get(row, 'Email Verification Expires'),
+    password_reset_token: get(row, 'Password Reset Token'),
+    password_reset_expires: get(row, 'Password Reset Expires'),
   }));
 }
 
@@ -431,7 +435,7 @@ export async function findUserByEmail(email: string) {
 
 export async function updateUserInSheet(
   email: string,
-  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires'>> & { email_verified?: string | boolean }
+  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires' | 'password_reset_token' | 'password_reset_expires'>> & { email_verified?: string | boolean }
 ) {
   const client = await getSheetsClient();
   if (!client) return { success: false, error: 'Google Sheets not configured' };
@@ -462,6 +466,8 @@ export async function updateUserInSheet(
   }
   set('Email Verification Code', updates.email_verification_code);
   set('Email Verification Expires', updates.email_verification_expires);
+  set('Password Reset Token', updates.password_reset_token);
+  set('Password Reset Expires', updates.password_reset_expires);
 
   const endColumn = columnNumberToName(headers.length);
   const range = `${usersTabName()}!A${rowIndex + 1}:${endColumn}${rowIndex + 1}`;
@@ -514,9 +520,28 @@ export async function createUserInSheet(user: {
         user.email_verified ? 'true' : 'false',
         user.email_verification_code || '',
         user.email_verification_expires || '',
+        '', // Password Reset Token
+        '', // Password Reset Expires
       ]],
     },
   }));
 
   return { success: true };
+}
+
+export async function findUserByPasswordResetToken(token: string) {
+  const users = await listUsersFromSheet();
+  const user = users.find((u) => u.password_reset_token === token);
+  
+  if (!user) return null;
+  
+  // Check if token has expired
+  if (user.password_reset_expires) {
+    const expiresAt = new Date(user.password_reset_expires);
+    if (new Date() > expiresAt) {
+      return null; // Token expired
+    }
+  }
+  
+  return user;
 }
