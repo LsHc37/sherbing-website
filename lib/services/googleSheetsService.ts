@@ -5,6 +5,7 @@ import { calculatePayoutBreakdown } from '@/lib/services/payoutService';
 
 type BookingSheetRow = {
   booking_id: string;
+  row_index?: number;
   customer_name: string;
   customer_email: string;
   customer_phone: string;
@@ -261,16 +262,19 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
     return row[index] || '';
   };
 
-  return rows.slice(1).map((row) => {
+  return rows.slice(1).map((row, dataIndex) => {
+    const rowIndex = dataIndex + 2;
     const estimatedPrice = Number(get(row, 'Estimated Price') || 0);
     const payout = calculatePayoutBreakdown(estimatedPrice);
     const city = get(row, 'City') || get(row, 'City/State/ZIP').split(',')[0]?.trim() || '';
     const state = get(row, 'State') || get(row, 'City/State/ZIP').split(',')[1]?.trim()?.split(' ')[0] || '';
     const zipCode = get(row, 'ZIP') || get(row, 'City/State/ZIP').split(' ').filter(Boolean).pop() || '';
     const cityStateZip = get(row, 'City/State/ZIP') || [city, state, zipCode].filter(Boolean).join(', ');
+    const bookingId = getAny(row, ['Booking ID', 'booking_id', 'BookingId', 'ID']) || `ROW-${rowIndex}`;
     return {
       timestamp: get(row, 'Timestamp'),
-      booking_id: getAny(row, ['Booking ID', 'booking_id', 'BookingId', 'ID']),
+      booking_id: bookingId,
+      row_index: rowIndex,
       customer_name: getAny(row, ['Customer Name', 'customer_name', 'Name']),
       customer_email: getAny(row, ['Email', 'customer_email']),
       customer_phone: getAny(row, ['Phone', 'customer_phone']),
@@ -425,9 +429,20 @@ export async function updateBookingInSheet(
     return { success: false, error: 'Booking ID column not found' };
   }
 
-  const bookingIndex = rows.findIndex((r, i) =>
-    i > 0 && bookingIdHeaderIndexCandidates.some((columnIndex) => (r[columnIndex] || '') === bookingId)
-  );
+  let bookingIndex = -1;
+  const syntheticMatch = /^ROW-(\d+)$/i.exec(bookingId);
+  if (syntheticMatch) {
+    const requestedRowNumber = Number(syntheticMatch[1]);
+    if (Number.isFinite(requestedRowNumber) && requestedRowNumber >= 2 && requestedRowNumber <= rows.length) {
+      bookingIndex = requestedRowNumber - 1;
+    }
+  }
+
+  if (bookingIndex === -1) {
+    bookingIndex = rows.findIndex((r, i) =>
+      i > 0 && bookingIdHeaderIndexCandidates.some((columnIndex) => (r[columnIndex] || '') === bookingId)
+    );
+  }
   if (bookingIndex === -1) return { success: false, error: 'Booking not found' };
 
   const row = rows[bookingIndex];

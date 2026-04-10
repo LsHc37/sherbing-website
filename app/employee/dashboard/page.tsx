@@ -185,7 +185,7 @@ export default function EmployeeDashboardPage() {
           </div>
           <div className="flex items-center gap-4 text-sm sm:text-base">
             {user?.role === 'admin' && <Link href="/admin/users" className="text-gray-700 hover:text-gray-900">Manage Users</Link>}
-            {user?.role === 'admin' && <Link href="/admin/bookings" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>}
+            {user?.role === 'admin' && <Link href="/admin/booking" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>}
             <button onClick={logout} className="text-gray-700 hover:text-gray-900">Logout</button>
           </div>
         </nav>
