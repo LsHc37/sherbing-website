@@ -85,6 +85,21 @@ export function getSessionMaxAgeSeconds() {
   return SESSION_MAX_AGE_SECONDS;
 }
 
+function getAuthCookieDomain() {
+  const domain = process.env.AUTH_COOKIE_DOMAIN?.trim();
+  return domain || undefined;
+}
+
+export function getSessionCookieSettings() {
+  return {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    domain: getAuthCookieDomain(),
+  };
+}
+
 export type VerificationToken = {
   email: string;
   code: string;

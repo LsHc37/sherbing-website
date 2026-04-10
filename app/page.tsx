@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Logo from '@/app/components/Logo';
 import ServiceShowcase from '@/app/components/ServiceShowcase';
+import AuthNavActions from '@/app/components/AuthNavActions';
 
 export default function Home() {
   return (
@@ -11,14 +12,7 @@ export default function Home() {
       <header className="glass-nav sticky top-0 z-40">
         <nav className="section-container py-4 flex justify-between items-center">
           <Logo variant="icon" size="small" />
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="btn-secondary text-sm sm:text-base">
-              Sign In
-            </Link>
-            <Link href="/signup" className="btn-primary text-sm sm:text-base">
-              Get Started
-            </Link>
-          </div>
+          <AuthNavActions />
         </nav>
       </header>
 

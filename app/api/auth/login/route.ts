@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSessionToken, getSessionCookieName, getSessionMaxAgeSeconds, hashPassword } from '@/lib/auth/session';
+import { createSessionToken, getSessionCookieName, getSessionCookieSettings, getSessionMaxAgeSeconds, hashPassword } from '@/lib/auth/session';
 import { findUserByEmail } from '@/lib/services/googleSheetsService';
 
 export async function POST(request: NextRequest) {
@@ -55,10 +55,7 @@ export async function POST(request: NextRequest) {
     );
 
     response.cookies.set(getSessionCookieName(), token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
+      ...getSessionCookieSettings(),
       maxAge: getSessionMaxAgeSeconds(),
     });
 

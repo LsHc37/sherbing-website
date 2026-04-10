@@ -123,10 +123,26 @@ export default function BookingContent() {
       }
 
       const data = await response.json();
-      setInferredPropertySqft(data.property_sqft);
-      setInferredYardSqft(data.yard_sqft);
-      setEstimatedPrice(data.estimate_price);
-      setEstimateSource('ai');
+      const estimatedPriceValue = Number(data.estimated_price);
+      const inferredPropertySqftValue = Number(data.inferred_property_sqft);
+      const inferredYardSqftValue = Number(data.inferred_yard_sqft);
+
+      if (Number.isFinite(estimatedPriceValue) && estimatedPriceValue > 0) {
+        setEstimatedPrice(estimatedPriceValue);
+      } else {
+        setErrors(['Unable to calculate estimate right now']);
+        return;
+      }
+
+      if (Number.isFinite(inferredPropertySqftValue) && inferredPropertySqftValue > 0) {
+        setInferredPropertySqft(inferredPropertySqftValue);
+      }
+
+      if (Number.isFinite(inferredYardSqftValue) && inferredYardSqftValue > 0) {
+        setInferredYardSqft(inferredYardSqftValue);
+      }
+
+      setEstimateSource(data.source === 'ai' ? 'ai' : 'standard');
     } catch (error) {
       setErrors(['Error connecting to estimate service']);
       console.error('Estimate error:', error);

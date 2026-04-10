@@ -1,6 +1,7 @@
 import {
   createSessionToken,
   getSessionCookieName,
+  getSessionCookieSettings,
   getSessionFromRequest,
   getSessionMaxAgeSeconds,
 } from '@/lib/auth/session';
@@ -35,10 +36,7 @@ export async function GET(request: NextRequest) {
   });
 
   response.cookies.set(getSessionCookieName(), refreshedToken, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
+    ...getSessionCookieSettings(),
     maxAge: getSessionMaxAgeSeconds(),
   });
 
