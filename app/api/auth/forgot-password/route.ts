@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findUserByEmail, updateUserInSheet } from '@/lib/services/googleSheetsService';
+import { findUserByEmail, initializeSheet, updateUserInSheet } from '@/lib/services/googleSheetsService';
 import { sendPasswordResetEmail } from '@/lib/services/bookingService';
 import crypto from 'crypto';
 
@@ -32,6 +32,14 @@ function getBaseUrl(request: NextRequest): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const init = await initializeSheet();
+    if (!init.success) {
+      return NextResponse.json(
+        { error: init.error || 'Google Sheets not configured' },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const { email } = body;
 

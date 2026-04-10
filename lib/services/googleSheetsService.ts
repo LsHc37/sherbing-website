@@ -227,6 +227,8 @@ export async function initializeSheet() {
     'Email Verified',
     'Email Verification Code',
     'Email Verification Expires',
+    'Password Reset Token',
+    'Password Reset Expires',
   ];
 
   const bookingInit = await ensureHeaders(bookingsTabName(), bookingHeaders);
