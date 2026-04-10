@@ -46,11 +46,20 @@ export async function PATCH(
     if (session.role === 'employee' || session.role === 'admin') {
       const status = body.status ? String(body.status) : undefined;
       const notes = body.notes ? String(body.notes) : undefined;
+      const assignedEmployee = body.assigned_employee ? String(body.assigned_employee).trim().toLowerCase() : undefined;
+      const scheduledDate = body.scheduled_date ? String(body.scheduled_date).trim() : undefined;
+      const scheduledTime = body.scheduled_time ? String(body.scheduled_time).trim() : undefined;
+
+      const resolvedAssignedEmployee = session.role === 'admin'
+        ? assignedEmployee
+        : session.email;
 
       const result = await updateBookingInSheet(bookingId, {
         status,
         notes,
-        assigned_employee: session.email,
+        assigned_employee: resolvedAssignedEmployee,
+        scheduled_date: scheduledDate,
+        scheduled_time: scheduledTime,
         customer_update_request: body.customer_update_request ? String(body.customer_update_request) : undefined,
       });
 

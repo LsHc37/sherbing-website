@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
       phone: user.phone,
       role: user.role,
       active: user.active,
+      available_dates: user.available_dates || '',
     }));
 
     return NextResponse.json(safeUsers);

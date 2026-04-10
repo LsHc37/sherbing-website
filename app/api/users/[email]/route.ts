@@ -18,6 +18,11 @@ export async function PATCH(
 
     const role = body.role ? String(body.role) : undefined;
     const active = body.active === undefined ? undefined : String(body.active);
+    const availableDates = Array.isArray(body.available_dates)
+      ? body.available_dates.map((value: unknown) => String(value).trim()).filter(Boolean).join(',')
+      : body.available_dates === undefined
+        ? undefined
+        : String(body.available_dates).trim();
 
     if (role && !['customer', 'employee', 'admin'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
@@ -26,6 +31,7 @@ export async function PATCH(
     const result = await updateUserInSheet(decodedEmail, {
       role: role as 'customer' | 'employee' | 'admin' | undefined,
       active,
+      available_dates: availableDates,
     });
 
     if (!result.success) {

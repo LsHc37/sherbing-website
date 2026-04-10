@@ -98,6 +98,7 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row justify-between gap-4 py-6 border-t border-slate-300 text-sm text-slate-600">
           <p>Sherbing | Serve Boise with reliable outdoor service teams.</p>
           <div className="flex gap-4">
+            <Link href="/about" className="hover:text-slate-900">About Us</Link>
             <Link href="/login" className="hover:text-slate-900">Sign In</Link>
             <Link href="/booking" className="hover:text-slate-900">Book Service</Link>
             <Link href="/signup" className="hover:text-slate-900">Get Started</Link>

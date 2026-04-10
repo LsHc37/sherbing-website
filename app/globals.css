@@ -23,6 +23,12 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   background:
     radial-gradient(circle at 8% 5%, rgba(159, 232, 112, 0.45), transparent 32%),
@@ -54,6 +60,8 @@ textarea {
 .page-shell {
   position: relative;
   isolation: isolate;
+  width: 100%;
+  overflow-x: clip;
 }
 
 .page-shell::before {
