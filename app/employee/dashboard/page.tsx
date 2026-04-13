@@ -56,23 +56,6 @@ function prettyStatus(status: string): string {
     .replace(/\b\w/g, (s) => s.toUpperCase());
 }
 
-function getStatusClass(status: string): string {
-  switch (status) {
-    case 'pending':
-      return 'bg-amber-100 text-amber-800';
-    case 'confirmed':
-      return 'bg-blue-100 text-blue-800';
-    case 'change_requested':
-      return 'bg-purple-100 text-purple-800';
-    case 'completed':
-      return 'bg-green-100 text-green-800';
-    case 'cancelled':
-      return 'bg-red-100 text-red-800';
-    default:
-      return 'bg-gray-100 text-gray-700';
-  }
-}
-
 function formatAddress(booking: Booking): string {
   const partOne = booking.address?.trim() || '';
   const partTwo = [booking.city, booking.state].map((value) => value?.trim()).filter(Boolean).join(', ');
@@ -130,7 +113,7 @@ function BookingCard({ booking, actionLoading, onUpdateSchedule }: BookingCardPr
         <div className="space-y-3 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-semibold text-gray-900">{services.join(', ') || 'Service'}</h3>
-            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusClass(booking.status)}`}>
+            <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
               {prettyStatus(booking.status)}
             </span>
           </div>
@@ -143,14 +126,11 @@ function BookingCard({ booking, actionLoading, onUpdateSchedule }: BookingCardPr
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 text-sm text-gray-600">
             <p><span className="font-medium text-gray-800">Customer:</span> {booking.customer_name || 'N/A'}</p>
-            <p><span className="font-medium text-gray-800">Assigned:</span> {booking.assigned_employee || 'Unassigned'}</p>
             <p><span className="font-medium text-gray-800">Email:</span> {booking.customer_email || 'N/A'}</p>
             <p><span className="font-medium text-gray-800">Phone:</span> {booking.customer_phone || 'N/A'}</p>
             <p><span className="font-medium text-gray-800">Scheduled Date:</span> {booking.scheduled_date || 'TBD'}</p>
             <p><span className="font-medium text-gray-800">Scheduled Time:</span> {booking.scheduled_time || 'TBD'}</p>
-            <p><span className="font-medium text-gray-800">Property Size:</span> {booking.property_sqft || 'N/A'} sqft</p>
-            <p><span className="font-medium text-gray-800">Yard Size:</span> {booking.yard_sqft || 'N/A'} sqft</p>
-            <p><span className="font-medium text-gray-800">Package:</span> {booking.package_id ? prettyStatus(booking.package_id) : 'N/A'}</p>
+            <p><span className="font-medium text-gray-800">Quoted Price:</span> {formatMoney(Number(booking.customer_price || booking.estimated_price || 0))}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-2xl">
@@ -196,27 +176,15 @@ function BookingCard({ booking, actionLoading, onUpdateSchedule }: BookingCardPr
             )}
           </div>
 
-          {booking.customer_update_request && (
-            <p className="text-sm font-medium text-blue-700">
-              Customer Request: {prettyStatus(booking.customer_update_request)}
-            </p>
-          )}
-          {booking.notes && <p className="text-sm text-gray-600"><span className="font-medium text-gray-800">Notes:</span> {booking.notes}</p>}
+          {booking.notes && <p className="text-sm text-gray-600"><span className="font-medium text-gray-800">Job Notes:</span> {booking.notes}</p>}
         </div>
 
-        <div className="w-full lg:w-80 border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Customer Pays</span>
-            <span className="font-semibold text-gray-900">{formatMoney(Number(booking.customer_price || booking.estimated_price))}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Sherbing Fee</span>
-            <span className="font-semibold text-gray-900">{formatMoney(Number(booking.sherbing_fee || 0))}</span>
-          </div>
-          <div className="pt-2 mt-2 border-t border-gray-200 flex justify-between text-sm">
-            <span className="text-gray-700 font-medium">Employee Earns</span>
-            <span className="font-bold text-green-600">{formatMoney(Number(booking.employee_payout || 0))}</span>
-          </div>
+        <div className="w-full lg:w-80 border border-emerald-200 rounded-lg p-4 bg-emerald-50 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Customer Quote</p>
+          <p className="text-3xl font-bold text-emerald-700">
+            {formatMoney(Number(booking.customer_price || booking.estimated_price || 0))}
+          </p>
+          <p className="text-xs text-emerald-800">This is the exact quoted customer price.</p>
         </div>
       </div>
     </article>
@@ -289,8 +257,8 @@ export default function EmployeeDashboardPage() {
     return bookings.filter((booking) => Boolean(booking.scheduled_date && booking.scheduled_time)).length;
   }, [bookings]);
 
-  const payoutTotal = useMemo(() => {
-    return bookings.reduce((sum, booking) => sum + Number(booking.employee_payout || 0), 0);
+  const quotedTotal = useMemo(() => {
+    return bookings.reduce((sum, booking) => sum + Number(booking.customer_price || booking.estimated_price || 0), 0);
   }, [bookings]);
 
   const updateSchedule = async (bookingId: string, scheduledDate: string, scheduledTime: string): Promise<void> => {
@@ -381,8 +349,8 @@ export default function EmployeeDashboardPage() {
             <p className="text-2xl font-bold text-gray-900">{scheduledCount}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Total Potential Earnings</p>
-            <p className="text-2xl font-bold text-green-600">{formatMoney(payoutTotal)}</p>
+            <p className="text-sm text-gray-500">Total Quoted Revenue</p>
+            <p className="text-2xl font-bold text-emerald-600">{formatMoney(quotedTotal)}</p>
           </div>
         </div>
 

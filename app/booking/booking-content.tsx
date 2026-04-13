@@ -14,6 +14,26 @@ type AvailabilitySlot = {
   status: 'open' | 'booked';
 };
 
+type DayOpenSlots = {
+  date: string;
+  openTimes: string[];
+};
+
+function toIsoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function addDays(baseDate: string, daysToAdd: number): string {
+  const d = new Date(`${baseDate}T00:00:00`);
+  d.setDate(d.getDate() + daysToAdd);
+  return toIsoDate(d);
+}
+
+function formatQuickDateLabel(isoDate: string): string {
+  const parsed = new Date(`${isoDate}T00:00:00`);
+  return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', weekday: 'short' });
+}
+
 export default function BookingContent() {
   const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
@@ -51,6 +71,7 @@ export default function BookingContent() {
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityError, setAvailabilityError] = useState('');
+  const [quickSelectDates, setQuickSelectDates] = useState<string[]>([]);
 
   const services = useMemo(() => getServices(), []);
   const minimumScheduleDate = useMemo(() => {
@@ -124,6 +145,16 @@ export default function BookingContent() {
     }));
   };
 
+  const fetchAvailabilityForDate = useCallback(async (date: string): Promise<AvailabilitySlot[]> => {
+    const response = await fetch(`/api/bookings/availability?date=${encodeURIComponent(date)}`);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body?.error || 'Failed to load availability');
+    }
+
+    return Array.isArray(body?.slots) ? (body.slots as AvailabilitySlot[]) : [];
+  }, []);
+
   const loadAvailability = useCallback(async (date: string) => {
     if (!date) {
       setAvailabilitySlots([]);
@@ -134,18 +165,12 @@ export default function BookingContent() {
     setAvailabilityLoading(true);
     setAvailabilityError('');
     try {
-      const response = await fetch(`/api/bookings/availability?date=${encodeURIComponent(date)}`);
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(body?.error || 'Failed to load availability');
-      }
-
-      const slots = Array.isArray(body?.slots) ? (body.slots as AvailabilitySlot[]) : [];
+      const slots = await fetchAvailabilityForDate(date);
       setAvailabilitySlots(slots);
 
       if (formData.scheduled_time) {
-        const selected = slots.find((slot) => slot.time === formData.scheduled_time);
-        if (!selected || selected.status === 'booked') {
+        const selected = slots.find((slot) => slot.time === formData.scheduled_time && slot.status === 'open');
+        if (!selected) {
           setFormData((prev) => ({ ...prev, scheduled_time: '' }));
         }
       }
@@ -155,7 +180,58 @@ export default function BookingContent() {
     } finally {
       setAvailabilityLoading(false);
     }
-  }, [formData.scheduled_time]);
+  }, [fetchAvailabilityForDate, formData.scheduled_time]);
+
+  const loadUpcomingOpenDates = useCallback(async (startDate: string) => {
+    const results: DayOpenSlots[] = [];
+
+    for (let offset = 0; offset < 45 && results.length < 4; offset += 1) {
+      const date = addDays(startDate, offset);
+      const slots = await fetchAvailabilityForDate(date);
+      const openTimes = slots.filter((slot) => slot.status === 'open').map((slot) => slot.time);
+      if (openTimes.length > 0) {
+        results.push({ date, openTimes });
+      }
+    }
+
+    return results;
+  }, [fetchAvailabilityForDate]);
+
+  useEffect(() => {
+    const bootstrapSoonestOpen = async () => {
+      setAvailabilityLoading(true);
+      setAvailabilityError('');
+      try {
+        const openDates = await loadUpcomingOpenDates(minimumScheduleDate);
+        setQuickSelectDates(openDates.slice(1, 4).map((entry) => entry.date));
+
+        if (openDates.length === 0) {
+          setFormData((prev) => ({
+            ...prev,
+            scheduled_date: minimumScheduleDate,
+            scheduled_time: '',
+          }));
+          setAvailabilitySlots([]);
+          return;
+        }
+
+        const soonest = openDates[0];
+        const soonestSlots = soonest.openTimes.map((time) => ({ time, status: 'open' as const }));
+        setFormData((prev) => ({
+          ...prev,
+          scheduled_date: soonest.date,
+          scheduled_time: soonest.openTimes[0] || '',
+        }));
+        setAvailabilitySlots(soonestSlots);
+      } catch (error) {
+        setAvailabilityError(error instanceof Error ? error.message : 'Failed to load availability');
+      } finally {
+        setAvailabilityLoading(false);
+      }
+    };
+
+    void bootstrapSoonestOpen();
+  }, [loadUpcomingOpenDates, minimumScheduleDate]);
 
   useEffect(() => {
     void loadAvailability(formData.scheduled_date);
@@ -167,6 +243,10 @@ export default function BookingContent() {
       scheduled_time: time,
     }));
   };
+
+  const openSlots = useMemo(() => {
+    return availabilitySlots.filter((slot) => slot.status === 'open');
+  }, [availabilitySlots]);
 
   const getAiEstimate = async () => {
     if (!canEstimate) {
@@ -572,6 +652,24 @@ export default function BookingContent() {
               </div>
             </div>
 
+            {quickSelectDates.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-slate-700 mb-2">Next closest open dates</p>
+                <div className="flex flex-wrap gap-2">
+                  {quickSelectDates.map((date) => (
+                    <button
+                      key={date}
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, scheduled_date: date, scheduled_time: '' }))}
+                      className="px-3 py-1.5 rounded-md border border-slate-300 bg-slate-50 text-slate-700 text-xs hover:bg-slate-100"
+                    >
+                      {formatQuickDateLabel(date)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {formData.scheduled_date && (
               <div className="rounded-lg border border-slate-200 p-4 bg-white">
                 <div className="flex items-center justify-between mb-3">
@@ -588,27 +686,38 @@ export default function BookingContent() {
                 {availabilityLoading && <p className="text-sm text-slate-600">Loading live availability...</p>}
                 {availabilityError && <p className="text-sm text-red-600">{availabilityError}</p>}
 
-                {!availabilityLoading && !availabilityError && availabilitySlots.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                    {availabilitySlots.map((slot) => {
-                      const isBooked = slot.status === 'booked';
-                      const isSelected = formData.scheduled_time === slot.time;
-                      return (
-                        <button
-                          key={slot.time}
-                          type="button"
-                          disabled={isBooked}
-                          onClick={() => selectTimeSlot(slot.time)}
-                          className={[
-                            'px-3 py-2 rounded text-sm border',
-                            isBooked ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-800 border-slate-300 hover:border-emerald-400',
-                            isSelected ? 'ring-2 ring-emerald-500 border-emerald-500' : '',
-                          ].join(' ')}
-                        >
-                          {slot.time} {isBooked ? '(Booked)' : '(Open)'}
-                        </button>
-                      );
-                    })}
+                {!availabilityLoading && !availabilityError && (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700">Open slot</span>
+                      <span className="px-2 py-1 rounded bg-slate-100 text-slate-700">Selected slot</span>
+                    </div>
+
+                    <div className="border border-emerald-200 rounded-lg p-3 bg-emerald-50/40">
+                      <p className="text-sm font-semibold text-emerald-800 mb-2">Open Times</p>
+                      {openSlots.length === 0 ? (
+                        <p className="text-sm text-amber-700">No available times this date.</p>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                          {openSlots.map((slot) => {
+                            const isSelected = formData.scheduled_time === slot.time;
+                            return (
+                              <button
+                                key={slot.time}
+                                type="button"
+                                onClick={() => selectTimeSlot(slot.time)}
+                                className={[
+                                  'px-3 py-2 rounded text-sm border bg-white text-slate-800 border-emerald-300 hover:border-emerald-500',
+                                  isSelected ? 'ring-2 ring-emerald-500 border-emerald-500 bg-emerald-100/70' : '',
+                                ].join(' ')}
+                              >
+                                {slot.time}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

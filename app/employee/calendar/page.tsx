@@ -174,6 +174,9 @@ export default function EmployeeCalendarPage() {
     return map;
   }, [bookings, selectedDate]);
 
+  const openSlotCount = useMemo(() => slots.filter((slot) => slot.status === 'open').length, [slots]);
+  const takenSlotCount = useMemo(() => slots.filter((slot) => slot.status === 'booked').length, [slots]);
+
   const addEntry = () => {
     setError('');
     setMessage('');
@@ -319,6 +322,21 @@ export default function EmployeeCalendarPage() {
             This view shows exactly what customers see as open/booked, plus customer details for booked times.
           </p>
 
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-xs uppercase tracking-wide text-emerald-700">Open Slots</p>
+              <p className="text-2xl font-bold text-emerald-700">{openSlotCount}</p>
+            </div>
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+              <p className="text-xs uppercase tracking-wide text-rose-700">Taken/Unavailable</p>
+              <p className="text-2xl font-bold text-rose-700">{takenSlotCount}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-700">Date</p>
+              <p className="text-sm font-semibold text-slate-900">{selectedDate || 'Not selected'}</p>
+            </div>
+          </div>
+
           {slotsLoading ? (
             <p className="text-sm text-gray-600">Loading day schedule...</p>
           ) : slots.length === 0 ? (
@@ -329,7 +347,10 @@ export default function EmployeeCalendarPage() {
                 const bookingsAtTime = dayBookingsByTime.get(slot.time) || [];
                 const isOpen = slot.status === 'open';
                 return (
-                  <div key={slot.time} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div key={slot.time} className={[
+                    'border rounded-lg p-4',
+                    isOpen ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/40',
+                  ].join(' ')}>
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-semibold text-gray-900">{slot.time}</p>
                       <span className={isOpen ? 'text-green-700 text-sm font-medium' : 'text-red-700 text-sm font-medium'}>
