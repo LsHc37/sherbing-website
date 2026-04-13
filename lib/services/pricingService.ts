@@ -42,13 +42,6 @@ export const SERVICE_PRICING: Record<string, PricingRule> = {
     description: 'Fertilization, weed control, and lawn health treatments to keep your grass green and healthy.',
     images: ['/services/lawn-treatment-1.jpg']
   },
-  landscaping: { 
-    name: 'Landscaping Design', 
-    pricePerSqft: 0.08, 
-    minimumPrice: 150,
-    description: 'Custom landscape design and installation to transform your outdoor space.',
-    images: ['/services/landscaping-1.jpg', '/services/landscaping-2.jpg']
-  },
   snow_removal: { 
     name: 'Snow Removal', 
     pricePerSqft: 0.015, 
@@ -82,55 +75,6 @@ export const SERVICE_PRICING: Record<string, PricingRule> = {
     description: 'Crystal-clear window cleaning inside and out for sparkling results.',
     images: ['/services/window-cleaning-1.jpg']
   },
-  yard_cleanup: { 
-    name: 'Yard Cleanup', 
-    pricePerSqft: 0.02, 
-    minimumPrice: 90,
-    description: 'Spring and fall yard cleanup including leaf removal and debris hauling.',
-    images: ['/services/yard-cleanup-1.jpg']
-  },
-  tree_service: { 
-    name: 'Tree Service', 
-    pricePerSqft: 0.03, 
-    minimumPrice: 180,
-    description: 'Professional tree trimming, removal, and stump grinding services.',
-    images: ['/services/tree-service-1.jpg', '/services/tree-service-2.jpg']
-  },
-  deck_staining: { 
-    name: 'Deck Staining', 
-    pricePerSqft: 0.03, 
-    minimumPrice: 160,
-    description: 'Professional deck staining and sealing to protect and beautify your deck.',
-    images: ['/services/deck-staining-1.jpg', '/services/deck-staining-2.jpg']
-  },
-  fence_painting: { 
-    name: 'Fence Painting', 
-    pricePerSqft: 0.03, 
-    minimumPrice: 150,
-    description: 'Quality fence painting to refresh and protect your fence investment.',
-    images: ['/services/fence-painting-1.jpg']
-  },
-  fence_staining: { 
-    name: 'Fence Staining', 
-    pricePerSqft: 0.035, 
-    minimumPrice: 175,
-    description: 'Professional fence staining to enhance natural look and longevity.',
-    images: ['/services/fence-staining-1.jpg']
-  },
-  mulch_installation: { 
-    name: 'Mulch Installation', 
-    pricePerSqft: 0.025, 
-    minimumPrice: 120,
-    description: 'Quality mulch installation for landscaping beds and erosion control.',
-    images: ['/services/mulch-installation-1.jpg']
-  },
-  rock_installation: { 
-    name: 'Rock Installation', 
-    pricePerSqft: 0.03, 
-    minimumPrice: 150,
-    description: 'Decorative rock installation for landscaping and hardscaping projects.',
-    images: ['/services/rock-installation-1.jpg']
-  },
   dog_waste_removal: { 
     name: 'Dog Waste Pickup', 
     pricePerSqft: 0.002, 
@@ -139,28 +83,12 @@ export const SERVICE_PRICING: Record<string, PricingRule> = {
     description: 'Weekly dog waste removal service to keep your yard clean and healthy.',
     images: ['/services/dog-waste-1.jpg']
   },
-  lawn_mow_dog_waste_combo: { 
-    name: 'Lawn Mow + Dog Waste Combo', 
-    pricePerSqft: 0.0065, 
-    minimumPrice: 40, 
-    maximumPrice: 45,
-    description: 'Combined lawn mowing and dog waste removal service at a discount.',
-    images: ['/services/combo-service-1.jpg']
-  },
-  pool_cleaning: { 
-    name: 'Pool Cleaning', 
-    pricePerSqft: 0, 
-    minimumPrice: 80, 
-    maximumPrice: 120,
-    description: 'Professional pool cleaning and maintenance to keep your pool crystal clear.',
-    images: ['/services/pool-cleaning-1.jpg']
-  },
 };
 
 export const SERVICE_PACKAGES: PackageRule[] = [
-  { id: 'starter_bundle', name: 'Starter Bundle (Mow + Cleanup)', discountPercent: 8 },
-  { id: 'curb_appeal_bundle', name: 'Curb Appeal Bundle', discountPercent: 10 },
-  { id: 'premium_property_bundle', name: 'Premium Property Bundle', discountPercent: 12 },
+  { id: 'starter_bundle', name: 'Starter Bundle (Lawn + Dog Waste)', discountPercent: 8 },
+  { id: 'curb_appeal_bundle', name: 'Curb Appeal Bundle (Lawn + Windows)', discountPercent: 10 },
+  { id: 'premium_property_bundle', name: 'Premium Property Bundle (Multi-Service)', discountPercent: 12 },
 ];
 
 export function calculateEstimatePrice(serviceId: string, propertySqft: number, yardSqft: number): number {

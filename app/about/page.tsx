@@ -55,8 +55,8 @@ export default function AboutPage() {
           <article className="surface-card p-7 appear-up stagger-1">
             <h2 className="text-2xl font-bold text-slate-900 mb-3">What We Do</h2>
             <p className="text-slate-700 leading-relaxed">
-              From lawn mowing and treatments to seasonal cleanup, fence and deck care, and specialty
-              services, we connect Boise-area customers with dependable crews and modern booking tools.
+              We focus on lawn mowing, lawn treatment, snow removal, gutter cleaning, dog waste pickup,
+              window cleaning, and hedge trimming for Boise-area homeowners.
             </p>
           </article>
 

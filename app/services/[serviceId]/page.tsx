@@ -6,21 +6,11 @@ import { SERVICE_DETAILS } from '@/lib/services/serviceDetails';
 const serviceIcons: Record<string, string> = {
   lawn_mowing: '🌿',
   lawn_treatment: '💚',
-  landscaping: '🌲',
   snow_removal: '❄️',
   gutter_cleaning: '🧼',
   hedge_trimming: '✂️',
   window_cleaning: '🪟',
-  yard_cleanup: '🧱',
-  tree_service: '🌲',
-  deck_staining: '🪵',
-  fence_painting: '🎨',
-  fence_staining: '🪵',
-  mulch_installation: '🌱',
-  rock_installation: '💎',
   dog_waste_removal: '🐕',
-  lawn_mow_dog_waste_combo: '🌿',
-  pool_cleaning: '💦',
 };
 
 export function generateStaticParams() {

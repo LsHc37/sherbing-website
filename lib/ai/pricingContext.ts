@@ -4,14 +4,11 @@ export const AI_PRICING_CONTEXT = {
   currency: 'USD',
   services: [
     { id: 'lawn_mowing', label: 'Lawn Mowing', targetRange: [35, 40] },
+    { id: 'lawn_treatment', label: 'Lawn Treatment', targetRange: [45, 75] },
     { id: 'dog_waste_removal', label: 'Dog Waste Pickup', targetRange: [10, 15] },
-    { id: 'lawn_mow_dog_waste_combo', label: 'Lawn Mow + Dog Waste Combo', targetRange: [40, 45] },
     { id: 'gutter_cleaning', label: 'Gutter Cleaning', targetRange: [100, 100] },
     { id: 'hedge_trimming', label: 'Hedge Trimming', targetRange: [20, 45] },
     { id: 'window_cleaning', label: 'Window Cleaning', targetRange: [30, 120] },
-    { id: 'fence_painting', label: 'Fence Painting', targetRange: [150, 260] },
-    { id: 'fence_staining', label: 'Fence Staining', targetRange: [175, 300] },
-    { id: 'yard_cleanup', label: 'Yard Cleanup', targetRange: [90, 220] },
     { id: 'snow_removal', label: 'Snow Removal', targetRange: [60, 140] },
   ],
   packageNotes: [
