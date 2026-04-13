@@ -102,7 +102,11 @@ export default function AdminBookingsPage() {
   };
 
   useEffect(() => {
-    void load();
+    const timeoutId = window.setTimeout(() => {
+      void load();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   const updateEdit = (bookingId: string, key: keyof BookingEdit, value: string) => {
@@ -146,6 +150,25 @@ export default function AdminBookingsPage() {
     await load();
   };
 
+  const clearAllBookings = async () => {
+    const confirmed = window.confirm('Clear all bookings? This permanently removes every booking record from the list.');
+    if (!confirmed) return;
+
+    setMessage('');
+    const response = await fetch('/api/bookings', {
+      method: 'DELETE',
+    });
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setMessage(body?.error || 'Failed to clear bookings');
+      return;
+    }
+
+    setMessage('All bookings were cleared successfully.');
+    await load();
+  };
+
   if (loading) {
     return <main className="p-8">Loading admin booking tools...</main>;
   }
@@ -169,8 +192,18 @@ export default function AdminBookingsPage() {
         {message && <div className="p-3 rounded bg-blue-50 border border-blue-200 text-blue-700">{message}</div>}
 
         <section className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-bold mb-2">Active Employees</h2>
-          <p className="text-sm text-gray-600 mb-4">Employees marked active can be assigned to bookings.</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-bold mb-1">Active Employees</h2>
+              <p className="text-sm text-gray-600">Employees marked active can be assigned to bookings.</p>
+            </div>
+            <button
+              onClick={clearAllBookings}
+              className="px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+            >
+              Clear All Bookings
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {employees.map((employee) => (
               <div key={employee.email} className="border rounded-lg p-3 text-sm">

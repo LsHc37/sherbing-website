@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
-  calculateMultiServiceEstimate,
   getServices,
-  SERVICE_PACKAGES,
   validateBookingForm,
 } from '@/lib/services/pricingService';
 
 type EstimateSource = 'standard' | 'ai';
+
+type AvailabilitySlot = {
+  time: string;
+  status: 'open' | 'booked';
+};
 
 export default function BookingContent() {
   const searchParams = useSearchParams();
@@ -45,8 +48,16 @@ export default function BookingContent() {
   const [errors, setErrors] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState('');
 
   const services = useMemo(() => getServices(), []);
+  const minimumScheduleDate = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return date.toISOString().slice(0, 10);
+  }, []);
 
   useEffect(() => {
     const queryServiceId = searchParams.get('service');
@@ -97,9 +108,63 @@ export default function BookingContent() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+
+    if (name === 'scheduled_date') {
+      setFormData((prev) => ({
+        ...prev,
+        scheduled_date: value,
+        scheduled_time: '',
+      }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
+    }));
+  };
+
+  const loadAvailability = useCallback(async (date: string) => {
+    if (!date) {
+      setAvailabilitySlots([]);
+      setAvailabilityError('');
+      return;
+    }
+
+    setAvailabilityLoading(true);
+    setAvailabilityError('');
+    try {
+      const response = await fetch(`/api/bookings/availability?date=${encodeURIComponent(date)}`);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body?.error || 'Failed to load availability');
+      }
+
+      const slots = Array.isArray(body?.slots) ? (body.slots as AvailabilitySlot[]) : [];
+      setAvailabilitySlots(slots);
+
+      if (formData.scheduled_time) {
+        const selected = slots.find((slot) => slot.time === formData.scheduled_time);
+        if (!selected || selected.status === 'booked') {
+          setFormData((prev) => ({ ...prev, scheduled_time: '' }));
+        }
+      }
+    } catch (error) {
+      setAvailabilityError(error instanceof Error ? error.message : 'Failed to load availability');
+      setAvailabilitySlots([]);
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  }, [formData.scheduled_time]);
+
+  useEffect(() => {
+    void loadAvailability(formData.scheduled_date);
+  }, [formData.scheduled_date, loadAvailability]);
+
+  const selectTimeSlot = (time: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      scheduled_time: time,
     }));
   };
 
@@ -446,7 +511,14 @@ export default function BookingContent() {
               <div className="bg-emerald-50 p-6 rounded-lg border border-emerald-200">
                 <p className="text-sm text-slate-600 mb-2">Estimated Price</p>
                 <p className="text-4xl font-bold text-emerald-700">${estimatedPrice.toFixed(2)}</p>
-                <p className="text-xs text-slate-500 mt-2">Based on property size and services selected</p>
+                <p className="text-xs text-slate-500 mt-2">
+                  Source: {estimateSource === 'ai' ? 'AI-assisted estimate' : 'Standard pricing estimate'}
+                </p>
+                {(inferredPropertySqft || inferredYardSqft) && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Inferred size: {inferredPropertySqft || 'N/A'} sqft home, {inferredYardSqft || 'N/A'} sqft lot
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -486,22 +558,62 @@ export default function BookingContent() {
           {/* Schedule */}
           <div className="surface-card p-8 appear-up stagger-4">
             <h2 className="text-2xl font-bold text-slate-900 mb-6">5. Schedule Service</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <input
                 type="date"
                 name="scheduled_date"
                 value={formData.scheduled_date}
                 onChange={handleInputChange}
+                min={minimumScheduleDate}
                 className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
-              <input
-                type="time"
-                name="scheduled_time"
-                value={formData.scheduled_time}
-                onChange={handleInputChange}
-                className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
+              <div className="px-4 py-3 border border-slate-200 rounded-lg bg-slate-50 text-sm text-slate-600 flex items-center">
+                {formData.scheduled_time ? `Selected time: ${formData.scheduled_time}` : 'Select a date to view open times'}
+              </div>
             </div>
+
+            {formData.scheduled_date && (
+              <div className="rounded-lg border border-slate-200 p-4 bg-white">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-slate-800">Available Times</p>
+                  <button
+                    type="button"
+                    onClick={() => void loadAvailability(formData.scheduled_date)}
+                    className="text-xs px-3 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                {availabilityLoading && <p className="text-sm text-slate-600">Loading live availability...</p>}
+                {availabilityError && <p className="text-sm text-red-600">{availabilityError}</p>}
+
+                {!availabilityLoading && !availabilityError && availabilitySlots.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {availabilitySlots.map((slot) => {
+                      const isBooked = slot.status === 'booked';
+                      const isSelected = formData.scheduled_time === slot.time;
+                      return (
+                        <button
+                          key={slot.time}
+                          type="button"
+                          disabled={isBooked}
+                          onClick={() => selectTimeSlot(slot.time)}
+                          className={[
+                            'px-3 py-2 rounded text-sm border',
+                            isBooked ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-800 border-slate-300 hover:border-emerald-400',
+                            isSelected ? 'ring-2 ring-emerald-500 border-emerald-500' : '',
+                          ].join(' ')}
+                        >
+                          {slot.time} {isBooked ? '(Booked)' : '(Open)'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             <textarea
               name="notes"
               placeholder="Any special instructions or notes?"

@@ -1,5 +1,6 @@
 import { getSessionFromRequest } from '@/lib/auth/session';
 import { findBookingById, updateBookingInSheet } from '@/lib/services/googleSheetsService';
+import { isBookingSlotAvailable } from '@/lib/services/googleSheetsService';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function PATCH(
@@ -49,6 +50,13 @@ export async function PATCH(
       const assignedEmployee = body.assigned_employee ? String(body.assigned_employee).trim().toLowerCase() : undefined;
       const scheduledDate = body.scheduled_date ? String(body.scheduled_date).trim() : undefined;
       const scheduledTime = body.scheduled_time ? String(body.scheduled_time).trim() : undefined;
+
+      if (scheduledDate && scheduledTime) {
+        const isAvailable = await isBookingSlotAvailable(scheduledDate, scheduledTime, bookingId);
+        if (!isAvailable) {
+          return NextResponse.json({ error: 'Selected date/time is already booked' }, { status: 409 });
+        }
+      }
 
       const resolvedAssignedEmployee = session.role === 'admin'
         ? assignedEmployee

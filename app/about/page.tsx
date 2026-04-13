@@ -147,8 +147,8 @@ export default function AboutPage() {
               </div>
 
               <blockquote className="mt-6 rounded-2xl border-l-4 border-emerald-500 bg-emerald-50/70 px-5 py-4 text-slate-700 italic">
-                "I want to build companies that solve real problems and create a better life for the
-                people around me."
+                &quot;I want to build companies that solve real problems and create a better life for the
+                people around me.&quot;
               </blockquote>
             </div>
           </div>
@@ -161,6 +161,19 @@ export default function AboutPage() {
           <p className="text-base sm:text-lg mt-4 text-emerald-100 max-w-2xl">
             Start with a service that fits your home and schedule. We&apos;ll help you get from quote to completed job quickly.
           </p>
+
+          <p className="mt-4 text-sm sm:text-base text-emerald-100">
+            Questions first? Email{' '}
+            <a href="mailto:contact.sherbing@gmail.com" className="font-semibold text-white underline underline-offset-4 hover:text-emerald-200">
+              contact.sherbing@gmail.com
+            </a>{' '}
+            or call/text{' '}
+            <a href="tel:2087618136" className="font-semibold text-white underline underline-offset-4 hover:text-emerald-200">
+              (208) 761-8136
+            </a>
+            .
+          </p>
+
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/booking" className="inline-flex items-center rounded-xl bg-white text-emerald-800 px-6 py-3 font-semibold hover:bg-emerald-50">
               Book Now

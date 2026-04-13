@@ -1,8 +1,10 @@
 import { addBookingToSheet } from '@/lib/services/googleSheetsService';
+import { clearAllBookingsInSheet } from '@/lib/services/googleSheetsService';
 import { sendBookingConfirmation } from '@/lib/services/bookingService';
 import type { BookingForm } from '@/lib/types';
 import { enforceMinimumCustomerPrice } from '@/lib/services/payoutService';
 import { getSessionFromRequest } from '@/lib/auth/session';
+import { isBookingSlotAvailable } from '@/lib/services/googleSheetsService';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -22,6 +24,15 @@ export async function POST(request: NextRequest) {
     }
     if (!body.address || !body.city || !body.state || !body.zip_code) {
       return NextResponse.json({ error: 'Full service address is required' }, { status: 400 });
+    }
+
+    const scheduledDate = String(body.scheduled_date || '').trim();
+    const scheduledTime = String(body.scheduled_time || '').trim();
+    if (scheduledDate && scheduledTime) {
+      const isAvailable = await isBookingSlotAvailable(scheduledDate, scheduledTime);
+      if (!isAvailable) {
+        return NextResponse.json({ error: 'That time slot was just booked. Please choose another time.' }, { status: 409 });
+      }
     }
 
     const bookingData: BookingForm & { booking_id: string; estimated_price: number } = {
@@ -62,6 +73,27 @@ export async function POST(request: NextRequest) {
     console.error('Booking API error:', error);
     return NextResponse.json(
       { error: 'Internal server error', details: (error as Error).message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = getSessionFromRequest(request);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const result = await clearAllBookingsInSheet();
+    if (!result.success) {
+      return NextResponse.json({ error: result.error || 'Failed to clear bookings' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: 'All bookings cleared' });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to clear bookings', details: (error as Error).message },
       { status: 500 }
     );
   }

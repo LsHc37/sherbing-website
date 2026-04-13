@@ -398,6 +398,123 @@ export async function listBookingsFromSheet() {
   return parseBookingRows(rows);
 }
 
+type SlotStatus = 'open' | 'booked';
+
+export type BookingAvailabilitySlot = {
+  time: string;
+  status: SlotStatus;
+};
+
+const DEFAULT_BOOKING_TIME_SLOTS = [
+  '08:00',
+  '09:00',
+  '10:00',
+  '11:00',
+  '12:00',
+  '13:00',
+  '14:00',
+  '15:00',
+  '16:00',
+  '17:00',
+];
+
+function normalizeDateString(value?: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) return raw;
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeTimeString(value?: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  const hhmmMatch = raw.match(/^([0-1]\d|2[0-3]):([0-5]\d)$/);
+  if (hhmmMatch) return raw;
+
+  const parsed = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (parsed) {
+    let hour = Number(parsed[1]);
+    const minute = parsed[2];
+    const meridiem = parsed[3].toUpperCase();
+    if (meridiem === 'PM' && hour < 12) hour += 12;
+    if (meridiem === 'AM' && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, '0')}:${minute}`;
+  }
+
+  return raw;
+}
+
+function isBookingBlockingSlot(status?: string) {
+  return String(status || '').toLowerCase() !== 'cancelled';
+}
+
+export async function getBookingAvailabilityForDate(date: string): Promise<BookingAvailabilitySlot[]> {
+  const targetDate = normalizeDateString(date);
+  if (!targetDate) {
+    return DEFAULT_BOOKING_TIME_SLOTS.map((time) => ({ time, status: 'open' }));
+  }
+
+  const bookings = await listBookingsFromSheet();
+  const bookedTimes = new Set(
+    bookings
+      .filter((booking) => normalizeDateString(booking.scheduled_date) === targetDate)
+      .filter((booking) => isBookingBlockingSlot(booking.status))
+      .map((booking) => normalizeTimeString(booking.scheduled_time))
+      .filter(Boolean)
+  );
+
+  return DEFAULT_BOOKING_TIME_SLOTS.map((time) => ({
+    time,
+    status: bookedTimes.has(time) ? 'booked' : 'open',
+  }));
+}
+
+export async function isBookingSlotAvailable(date: string, time: string, excludeBookingId?: string) {
+  const targetDate = normalizeDateString(date);
+  const targetTime = normalizeTimeString(time);
+  if (!targetDate || !targetTime) return true;
+
+  const bookings = await listBookingsFromSheet();
+
+  return !bookings.some((booking) => {
+    const sameBooking = excludeBookingId && booking.booking_id === excludeBookingId;
+    if (sameBooking) return false;
+
+    return (
+      normalizeDateString(booking.scheduled_date) === targetDate
+      && normalizeTimeString(booking.scheduled_time) === targetTime
+      && isBookingBlockingSlot(booking.status)
+    );
+  });
+}
+
+export async function clearAllBookingsInSheet() {
+  const client = await getSheetsClient();
+  if (!client) return { success: false as const, error: 'Google Sheets not configured' };
+  const range = `${bookingsTabName()}!A2:ZZ`;
+
+  try {
+    await withRetry(() => client.sheets.spreadsheets.values.clear({
+      spreadsheetId: client.spreadsheetId,
+      range,
+    }));
+
+    return { success: true as const };
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message };
+  }
+}
+
 export async function listBookingsByCustomerEmail(email: string) {
   const target = email.toLowerCase();
   const all = await listBookingsFromSheet();

@@ -109,17 +109,22 @@ function includesSearchTerm(booking: Booking, term: string): boolean {
 type BookingCardProps = {
   booking: Booking;
   userEmail: string;
+  canManageAll: boolean;
   actionLoading: string | null;
   onMarkStatus: (bookingId: string, status: string) => Promise<void>;
+  onUpdateSchedule: (bookingId: string, scheduledDate: string, scheduledTime: string) => Promise<void>;
 };
 
-function BookingCard({ booking, userEmail, actionLoading, onMarkStatus }: BookingCardProps) {
+function BookingCard({ booking, userEmail, canManageAll, actionLoading, onMarkStatus, onUpdateSchedule }: BookingCardProps) {
   const normalizedAssignee = String(booking.assigned_employee || '').toLowerCase();
   const claimedByCurrentUser = normalizedAssignee && normalizedAssignee === userEmail;
   const claimedByOther = normalizedAssignee && normalizedAssignee !== userEmail;
   const services = parseServices(booking.service_id);
   const canClaim = !normalizedAssignee && booking.status === 'pending';
   const canComplete = claimedByCurrentUser && !FINAL_STATUSES.has(booking.status);
+  const canEditSchedule = canManageAll || claimedByCurrentUser;
+  const [scheduledDateDraft, setScheduledDateDraft] = useState(booking.scheduled_date || '');
+  const [scheduledTimeDraft, setScheduledTimeDraft] = useState(booking.scheduled_time || '');
 
   return (
     <article className="p-6">
@@ -155,6 +160,30 @@ function BookingCard({ booking, userEmail, actionLoading, onMarkStatus }: Bookin
             <p><span className="font-medium text-gray-800">Yard Size:</span> {booking.yard_sqft || 'N/A'} sqft</p>
             <p><span className="font-medium text-gray-800">Package:</span> {booking.package_id ? prettyStatus(booking.package_id) : 'N/A'}</p>
           </div>
+
+          {canEditSchedule && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-2xl">
+              <input
+                type="date"
+                value={scheduledDateDraft}
+                onChange={(event) => setScheduledDateDraft(event.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <input
+                type="time"
+                value={scheduledTimeDraft}
+                onChange={(event) => setScheduledTimeDraft(event.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <button
+                onClick={() => void onUpdateSchedule(booking.id, scheduledDateDraft, scheduledTimeDraft)}
+                disabled={actionLoading === booking.id + 'schedule'}
+                className="px-3 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {actionLoading === booking.id + 'schedule' ? 'Saving...' : 'Save Schedule'}
+              </button>
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2">
             <a
@@ -232,8 +261,10 @@ type BookingSectionProps = {
   bookings: Booking[];
   emptyMessage: string;
   userEmail: string;
+  canManageAll: boolean;
   actionLoading: string | null;
   onMarkStatus: (bookingId: string, status: string) => Promise<void>;
+  onUpdateSchedule: (bookingId: string, scheduledDate: string, scheduledTime: string) => Promise<void>;
 };
 
 function BookingSection({
@@ -242,8 +273,10 @@ function BookingSection({
   bookings,
   emptyMessage,
   userEmail,
+  canManageAll,
   actionLoading,
   onMarkStatus,
+  onUpdateSchedule,
 }: BookingSectionProps) {
   return (
     <section className="bg-white rounded-lg shadow">
@@ -258,11 +291,13 @@ function BookingSection({
         <div className="divide-y">
           {bookings.map((booking) => (
             <BookingCard
-              key={booking.id}
+              key={`${booking.id}-${booking.scheduled_date || ''}-${booking.scheduled_time || ''}`}
               booking={booking}
               userEmail={userEmail}
+              canManageAll={canManageAll}
               actionLoading={actionLoading}
               onMarkStatus={onMarkStatus}
+              onUpdateSchedule={onUpdateSchedule}
             />
           ))}
         </div>
@@ -426,6 +461,43 @@ export default function EmployeeDashboardPage() {
     }
   };
 
+  const updateSchedule = async (bookingId: string, scheduledDate: string, scheduledTime: string): Promise<void> => {
+    setActionLoading(bookingId + 'schedule');
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scheduled_date: scheduledDate,
+          scheduled_time: scheduledTime,
+        }),
+      });
+
+      const raw = await response.text();
+      let body: { error?: string } = {};
+      if (raw) {
+        try {
+          body = JSON.parse(raw) as { error?: string };
+        } catch {
+          body = {};
+        }
+      }
+      if (!response.ok) {
+        throw new Error(body?.error || 'Failed to update schedule');
+      }
+
+      setMessage('Schedule updated successfully.');
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update schedule');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/';
@@ -510,8 +582,10 @@ export default function EmployeeDashboardPage() {
           bookings={filteredClaimedByMe}
           emptyMessage="No active jobs assigned to you right now."
           userEmail={normalizedUserEmail}
+          canManageAll={user?.role === 'admin'}
           actionLoading={actionLoading}
           onMarkStatus={markStatus}
+          onUpdateSchedule={updateSchedule}
         />
 
         <BookingSection
@@ -520,8 +594,10 @@ export default function EmployeeDashboardPage() {
           bookings={filteredUnclaimedOpenJobs}
           emptyMessage="No unclaimed jobs are available right now."
           userEmail={normalizedUserEmail}
+          canManageAll={user?.role === 'admin'}
           actionLoading={actionLoading}
           onMarkStatus={markStatus}
+          onUpdateSchedule={updateSchedule}
         />
 
         <BookingSection
@@ -530,8 +606,10 @@ export default function EmployeeDashboardPage() {
           bookings={filteredAssignedToOthers}
           emptyMessage="No team-assigned open jobs right now."
           userEmail={normalizedUserEmail}
+          canManageAll={user?.role === 'admin'}
           actionLoading={actionLoading}
           onMarkStatus={markStatus}
+          onUpdateSchedule={updateSchedule}
         />
 
         <BookingSection
@@ -540,8 +618,10 @@ export default function EmployeeDashboardPage() {
           bookings={filteredMyCompletedJobs}
           emptyMessage="No completed jobs recorded for your account yet."
           userEmail={normalizedUserEmail}
+          canManageAll={user?.role === 'admin'}
           actionLoading={actionLoading}
           onMarkStatus={markStatus}
+          onUpdateSchedule={updateSchedule}
         />
 
         <BookingSection
@@ -550,8 +630,10 @@ export default function EmployeeDashboardPage() {
           bookings={filteredOtherHistory}
           emptyMessage="No additional booking history found."
           userEmail={normalizedUserEmail}
+          canManageAll={user?.role === 'admin'}
           actionLoading={actionLoading}
           onMarkStatus={markStatus}
+          onUpdateSchedule={updateSchedule}
         />
       </div>
     </main>

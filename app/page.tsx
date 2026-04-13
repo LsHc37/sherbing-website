@@ -91,6 +91,21 @@ export default function Home() {
               Create Free Account
             </Link>
           </div>
+
+          <div className="mt-8 rounded-2xl border border-white/25 bg-white/10 px-5 py-4 text-sm sm:text-base">
+            <p className="font-semibold text-white">Need help before booking?</p>
+            <p className="mt-2 text-emerald-100">
+              Reach Sherbing at{' '}
+              <a href="mailto:contact.sherbing@gmail.com" className="font-semibold text-white underline underline-offset-4 hover:text-emerald-200">
+                contact.sherbing@gmail.com
+              </a>{' '}
+              or{' '}
+              <a href="tel:2087618136" className="font-semibold text-white underline underline-offset-4 hover:text-emerald-200">
+                (208) 761-8136
+              </a>
+              .
+            </p>
+          </div>
         </div>
       </section>
 
