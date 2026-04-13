@@ -242,61 +242,141 @@ export async function initializeSheet() {
 
 function parseBookingRows(rows: string[][]): BookingSheetRow[] {
   if (rows.length < 2) return [];
-  const headers = rows[0];
-  const idx = (name: string) => headers.indexOf(name);
-  const idxAny = (names: string[]) => {
-    for (const name of names) {
-      const index = idx(name);
-      if (index >= 0) return index;
+  const headers = rows[0].map((header) => String(header || '').trim());
+  const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normalizedHeaders = headers.map(normalizeHeader);
+
+  const aliasIndices = (aliases: string[]) => {
+    const normalizedAliases = aliases.map(normalizeHeader);
+    return normalizedHeaders
+      .map((header, index) => ({ header, index }))
+      .filter(({ header }) => normalizedAliases.includes(header))
+      .map(({ index }) => index);
+  };
+
+  const getByAliases = (row: string[], aliases: string[]) => {
+    const indexes = aliasIndices(aliases);
+    for (const index of indexes) {
+      const value = String(row[index] || '').trim();
+      if (value) return value;
     }
-    return -1;
+    return '';
   };
-  const get = (row: string[], name: string) => {
-    const index = idx(name);
-    if (index < 0) return '';
-    return row[index] || '';
-  };
-  const getAny = (row: string[], names: string[]) => {
-    const index = idxAny(names);
-    if (index < 0) return '';
-    return row[index] || '';
+
+  const getAt = (row: string[], index: number) => String(row[index] || '').trim();
+  const hasLetters = (value: string) => /[a-zA-Z]/.test(value);
+  const hasDigits = (value: string) => /\d/.test(value);
+  const isLikelyEmail = (value: string) => /.+@.+\..+/.test(value);
+  const isMostlyNumeric = (value: string) => /^[\d.,$\s-]+$/.test(value) && !hasLetters(value);
+
+  const scoreCandidate = (candidate: Pick<BookingSheetRow, 'customer_name' | 'customer_email' | 'customer_phone' | 'address' | 'service' | 'city'>) => {
+    let score = 0;
+    if (isLikelyEmail(candidate.customer_email)) score += 4;
+    if (candidate.customer_name && !isMostlyNumeric(candidate.customer_name)) score += 3;
+    if (candidate.address && hasLetters(candidate.address) && hasDigits(candidate.address)) score += 3;
+    if (candidate.service && !isMostlyNumeric(candidate.service)) score += 2;
+    if ((candidate.customer_phone || '').replace(/\D/g, '').length >= 7) score += 1;
+    if (candidate.city && hasLetters(candidate.city) && !isMostlyNumeric(candidate.city)) score += 1;
+    return score;
   };
 
   return rows.slice(1).map((row, dataIndex) => {
     const rowIndex = dataIndex + 2;
-    const estimatedPrice = Number(get(row, 'Estimated Price') || 0);
+
+    const headerBasedBase = {
+      timestamp: getByAliases(row, ['Timestamp']),
+      booking_id: getByAliases(row, ['Booking ID', 'booking_id', 'BookingId', 'ID']) || `ROW-${rowIndex}`,
+      customer_name: getByAliases(row, ['Customer Name', 'customer_name', 'Name']),
+      customer_email: getByAliases(row, ['Email', 'customer_email']),
+      customer_phone: getByAliases(row, ['Phone', 'customer_phone']),
+      address: getByAliases(row, ['Address', 'address']),
+      city_state_zip: getByAliases(row, ['City/State/ZIP', 'city_state_zip']),
+      city: getByAliases(row, ['City', 'city']),
+      state: getByAliases(row, ['State', 'state']),
+      zip_code: getByAliases(row, ['ZIP', 'zip_code', 'zip']),
+      service: getByAliases(row, ['Service', 'service_id', 'service']),
+      property_sqft: getByAliases(row, ['Property Size (sqft)', 'property_sqft']),
+      yard_sqft: getByAliases(row, ['Yard Size (sqft)', 'yard_sqft']),
+      scheduled_date: getByAliases(row, ['Scheduled Date', 'scheduled_date']),
+      scheduled_time: getByAliases(row, ['Scheduled Time', 'scheduled_time']),
+      estimated_price: getByAliases(row, ['Estimated Price', 'estimated_price']) || '0',
+      customer_price: getByAliases(row, ['Customer Price', 'customer_price']),
+      sherbing_fee: getByAliases(row, ['Sherbing Fee', 'sherbing_fee']),
+      employee_payout: getByAliases(row, ['Employee Payout', 'employee_payout']),
+      package: getByAliases(row, ['Package', 'package_id']),
+      notes: getByAliases(row, ['Notes', 'notes']),
+      status: getByAliases(row, ['Status', 'status']) || 'pending',
+      assigned_employee: getByAliases(row, ['Assigned Employee', 'assigned_employee']),
+      customer_update_request: getByAliases(row, ['Customer Update Request', 'customer_update_request']),
+    };
+
+    const positionalBase = {
+      timestamp: getAt(row, 0),
+      booking_id: getAt(row, 1) || `ROW-${rowIndex}`,
+      customer_name: getAt(row, 2),
+      customer_email: getAt(row, 3),
+      customer_phone: getAt(row, 4),
+      address: getAt(row, 5),
+      city_state_zip: getAt(row, 6),
+      city: getAt(row, 7),
+      state: getAt(row, 8),
+      zip_code: getAt(row, 9),
+      service: getAt(row, 10),
+      property_sqft: getAt(row, 11),
+      yard_sqft: getAt(row, 12),
+      scheduled_date: getAt(row, 13),
+      scheduled_time: getAt(row, 14),
+      estimated_price: getAt(row, 15) || '0',
+      customer_price: getAt(row, 16),
+      sherbing_fee: getAt(row, 17),
+      employee_payout: getAt(row, 18),
+      package: getAt(row, 19),
+      notes: getAt(row, 20),
+      status: getAt(row, 21) || 'pending',
+      assigned_employee: getAt(row, 22),
+      customer_update_request: getAt(row, 23),
+    };
+
+    const usePositional = scoreCandidate(positionalBase) > scoreCandidate(headerBasedBase);
+    const base = usePositional ? positionalBase : headerBasedBase;
+
+    const estimatedPrice = Number(base.estimated_price || 0);
     const payout = calculatePayoutBreakdown(estimatedPrice);
-    const city = get(row, 'City') || get(row, 'City/State/ZIP').split(',')[0]?.trim() || '';
-    const state = get(row, 'State') || get(row, 'City/State/ZIP').split(',')[1]?.trim()?.split(' ')[0] || '';
-    const zipCode = get(row, 'ZIP') || get(row, 'City/State/ZIP').split(' ').filter(Boolean).pop() || '';
-    const cityStateZip = get(row, 'City/State/ZIP') || [city, state, zipCode].filter(Boolean).join(', ');
-    const bookingId = getAny(row, ['Booking ID', 'booking_id', 'BookingId', 'ID']) || `ROW-${rowIndex}`;
+    const fallbackCity = base.city_state_zip.split(',')[0]?.trim() || '';
+    const fallbackStateZip = base.city_state_zip.split(',')[1]?.trim() || '';
+    const fallbackState = fallbackStateZip.split(' ')[0] || '';
+    const fallbackZip = fallbackStateZip.split(' ').filter(Boolean).pop() || '';
+    const city = base.city || fallbackCity;
+    const state = base.state || fallbackState;
+    const zipCode = base.zip_code || fallbackZip;
+    const cityStateZip = base.city_state_zip || [city, state, zipCode].filter(Boolean).join(', ');
+
     return {
-      timestamp: get(row, 'Timestamp'),
-      booking_id: bookingId,
+      timestamp: base.timestamp,
+      booking_id: base.booking_id,
       row_index: rowIndex,
-      customer_name: getAny(row, ['Customer Name', 'customer_name', 'Name']),
-      customer_email: getAny(row, ['Email', 'customer_email']),
-      customer_phone: getAny(row, ['Phone', 'customer_phone']),
-      address: getAny(row, ['Address', 'address']),
+      customer_name: base.customer_name,
+      customer_email: base.customer_email,
+      customer_phone: base.customer_phone,
+      address: base.address,
       city_state_zip: cityStateZip,
       city,
       state,
       zip_code: zipCode,
-      service: getAny(row, ['Service', 'service_id', 'service']),
-      property_sqft: getAny(row, ['Property Size (sqft)', 'property_sqft']),
-      yard_sqft: getAny(row, ['Yard Size (sqft)', 'yard_sqft']),
-      scheduled_date: getAny(row, ['Scheduled Date', 'scheduled_date']),
-      scheduled_time: getAny(row, ['Scheduled Time', 'scheduled_time']),
-      estimated_price: getAny(row, ['Estimated Price', 'estimated_price']) || '0',
-      customer_price: getAny(row, ['Customer Price', 'customer_price']) || String(payout.customerPrice),
-      sherbing_fee: getAny(row, ['Sherbing Fee', 'sherbing_fee']) || String(payout.sherbingFee),
-      employee_payout: getAny(row, ['Employee Payout', 'employee_payout']) || String(payout.employeePayout),
-      package: getAny(row, ['Package', 'package_id']),
-      notes: getAny(row, ['Notes', 'notes']),
-      status: getAny(row, ['Status', 'status']) || 'pending',
-      assigned_employee: getAny(row, ['Assigned Employee', 'assigned_employee']),
-      customer_update_request: getAny(row, ['Customer Update Request', 'customer_update_request']),
+      service: base.service,
+      property_sqft: base.property_sqft,
+      yard_sqft: base.yard_sqft,
+      scheduled_date: base.scheduled_date,
+      scheduled_time: base.scheduled_time,
+      estimated_price: base.estimated_price || '0',
+      customer_price: base.customer_price || String(payout.customerPrice),
+      sherbing_fee: base.sherbing_fee || String(payout.sherbingFee),
+      employee_payout: base.employee_payout || String(payout.employeePayout),
+      package: base.package,
+      notes: base.notes,
+      status: base.status || 'pending',
+      assigned_employee: base.assigned_employee,
+      customer_update_request: base.customer_update_request,
     };
   });
 }
@@ -410,6 +490,8 @@ export type EmployeeAvailabilityEntry = {
   start: string;
   end: string;
   type: 'open' | 'blocked';
+  repeat?: 'none' | 'daily' | 'weekly' | 'weekdays';
+  until?: string;
 };
 
 const DEFAULT_BOOKING_TIME_SLOTS = [
@@ -479,6 +561,45 @@ function isTimeWithinRange(time: string, start: string, end: string) {
     && compareTimeStrings(normalizedTime, normalizedEnd) < 0;
 }
 
+function toDateOnly(value: string) {
+  return new Date(`${value}T00:00:00`);
+}
+
+function daysBetween(start: string, end: string) {
+  const ms = toDateOnly(end).getTime() - toDateOnly(start).getTime();
+  return Math.floor(ms / (1000 * 60 * 60 * 24));
+}
+
+function isWeekday(date: string) {
+  const day = toDateOnly(date).getDay();
+  return day >= 1 && day <= 5;
+}
+
+function appliesOnDate(entry: EmployeeAvailabilityEntry, targetDate: string) {
+  if (!entry.date || targetDate < entry.date) return false;
+  if (entry.until && targetDate > entry.until) return false;
+
+  const repeat = entry.repeat || 'none';
+  if (repeat === 'none') {
+    return targetDate === entry.date;
+  }
+
+  if (repeat === 'daily') {
+    return true;
+  }
+
+  if (repeat === 'weekdays') {
+    return isWeekday(targetDate);
+  }
+
+  if (repeat === 'weekly') {
+    const delta = daysBetween(entry.date, targetDate);
+    return delta >= 0 && delta % 7 === 0;
+  }
+
+  return false;
+}
+
 export function parseEmployeeAvailabilityEntries(raw: string | undefined): EmployeeAvailabilityEntry[] {
   const value = String(raw || '').trim();
   if (!value) return [];
@@ -488,7 +609,7 @@ export function parseEmployeeAvailabilityEntries(raw: string | undefined): Emplo
     .map((entry) => entry.trim())
     .filter(Boolean)
     .map((entry) => {
-      const [rawDate, rawStart, rawEnd, rawType] = entry.split('|').map((part) => part.trim());
+      const [rawDate, rawStart, rawEnd, rawType, rawRepeat, rawUntil] = entry.split('|').map((part) => part.trim());
       const date = normalizeDateString(rawDate);
 
       // Support legacy date-only entries as full-day open availability.
@@ -504,8 +625,14 @@ export function parseEmployeeAvailabilityEntries(raw: string | undefined): Emplo
       const start = normalizeTimeString(rawStart || '');
       const end = normalizeTimeString(rawEnd || '');
       const type = rawType === 'blocked' ? 'blocked' : 'open';
+      const repeat = ['none', 'daily', 'weekly', 'weekdays'].includes(rawRepeat) ? (rawRepeat as EmployeeAvailabilityEntry['repeat']) : 'none';
+      const until = normalizeDateString(rawUntil || '');
 
       if (!date || !start || !end || compareTimeStrings(start, end) >= 0) {
+        return null;
+      }
+
+      if (until && until < date) {
         return null;
       }
 
@@ -514,6 +641,8 @@ export function parseEmployeeAvailabilityEntries(raw: string | undefined): Emplo
         start,
         end,
         type,
+        repeat,
+        until: until || undefined,
       };
     })
     .filter((entry): entry is EmployeeAvailabilityEntry => Boolean(entry));
@@ -542,8 +671,8 @@ export async function getBookingAvailabilityForDate(date: string): Promise<Booki
   });
 
   const allEntries = activeWorkers.flatMap((worker) => parseEmployeeAvailabilityEntries(worker.available_dates));
-  const openWindows = allEntries.filter((entry) => entry.date === targetDate && entry.type === 'open');
-  const blockedWindows = allEntries.filter((entry) => entry.date === targetDate && entry.type === 'blocked');
+  const openWindows = allEntries.filter((entry) => entry.type === 'open' && appliesOnDate(entry, targetDate));
+  const blockedWindows = allEntries.filter((entry) => entry.type === 'blocked' && appliesOnDate(entry, targetDate));
   const hasOpenWindows = openWindows.length > 0;
 
   return DEFAULT_BOOKING_TIME_SLOTS.map((time) => ({

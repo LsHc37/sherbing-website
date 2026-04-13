@@ -11,6 +11,8 @@ type AvailabilityPayloadEntry = {
   start: string;
   end: string;
   type: 'open' | 'blocked';
+  repeat?: 'none' | 'daily' | 'weekly' | 'weekdays';
+  until?: string;
 };
 
 function normalizeDate(value: string) {
@@ -27,7 +29,7 @@ function normalizeTime(value: string) {
 
 function serializeEntries(entries: AvailabilityPayloadEntry[]) {
   return entries
-    .map((entry) => `${entry.date}|${entry.start}|${entry.end}|${entry.type}`)
+    .map((entry) => `${entry.date}|${entry.start}|${entry.end}|${entry.type}|${entry.repeat || 'none'}|${entry.until || ''}`)
     .join(',');
 }
 
@@ -66,6 +68,7 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
     const rawEntries = Array.isArray(body?.entries) ? body.entries : [];
+    let invalidCount = 0;
 
     const normalized = rawEntries
       .map((entry: unknown) => {
@@ -74,14 +77,31 @@ export async function PATCH(request: NextRequest) {
         const start = normalizeTime(String(value?.start || ''));
         const end = normalizeTime(String(value?.end || ''));
         const type = value?.type === 'blocked' ? 'blocked' : 'open';
+        const repeat = value?.repeat && ['none', 'daily', 'weekly', 'weekdays'].includes(value.repeat)
+          ? value.repeat
+          : 'none';
+        const until = value?.until ? normalizeDate(String(value.until)) : '';
 
         if (!date || !start || !end || start >= end) {
+          invalidCount += 1;
           return null;
         }
 
-        return { date, start, end, type } as AvailabilityPayloadEntry;
+        if (until && until < date) {
+          invalidCount += 1;
+          return null;
+        }
+
+        return { date, start, end, type, repeat, until: until || undefined } as AvailabilityPayloadEntry;
       })
       .filter((entry: AvailabilityPayloadEntry | null): entry is AvailabilityPayloadEntry => Boolean(entry));
+
+    if (invalidCount > 0) {
+      return NextResponse.json(
+        { error: `Could not save calendar: ${invalidCount} invalid entr${invalidCount === 1 ? 'y' : 'ies'} detected.` },
+        { status: 400 }
+      );
+    }
 
     const saveValue = serializeEntries(normalized);
     const result = await updateUserInSheet(session.email, { available_dates: saveValue });

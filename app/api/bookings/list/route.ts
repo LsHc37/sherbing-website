@@ -4,6 +4,19 @@ import { getSessionFromRequest } from '@/lib/auth/session';
 import { listBookingsFromSheet } from '@/lib/services/googleSheetsService';
 import { calculatePayoutBreakdown } from '@/lib/services/payoutService';
 
+function parseCurrencyValue(value: unknown): number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  const raw = String(value ?? '').trim();
+  if (!raw) return 0;
+
+  const normalized = raw.replace(/[^\d.-]/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = getSessionFromRequest(request);
@@ -18,7 +31,10 @@ export async function GET(request: NextRequest) {
       const city = booking.city || fallbackCity;
       const state = booking.state || fallbackState;
       const zip = booking.zip_code || fallbackZip;
-      const estimatedPrice = Number(booking.estimated_price || 0);
+      const estimatedPrice = parseCurrencyValue(booking.estimated_price);
+      const customerPrice = parseCurrencyValue(booking.customer_price);
+      const sherbingFee = parseCurrencyValue(booking.sherbing_fee);
+      const employeePayout = parseCurrencyValue(booking.employee_payout);
       const payout = calculatePayoutBreakdown(estimatedPrice);
       return {
         id: booking.booking_id,
@@ -36,9 +52,9 @@ export async function GET(request: NextRequest) {
         scheduled_date: booking.scheduled_date || '',
         scheduled_time: booking.scheduled_time || '',
         estimated_price: payout.customerPrice,
-        customer_price: Number(booking.customer_price || payout.customerPrice),
-        sherbing_fee: Number(booking.sherbing_fee || payout.sherbingFee),
-        employee_payout: Number(booking.employee_payout || payout.employeePayout),
+        customer_price: customerPrice || payout.customerPrice,
+        sherbing_fee: sherbingFee || payout.sherbingFee,
+        employee_payout: employeePayout || payout.employeePayout,
         status: booking.status || 'pending',
         assigned_employee: booking.assigned_employee || '',
         customer_update_request: booking.customer_update_request || '',

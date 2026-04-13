@@ -15,6 +15,8 @@ type AvailabilityEntry = {
   start: string;
   end: string;
   type: 'open' | 'blocked';
+  repeat?: 'none' | 'daily' | 'weekly' | 'weekdays';
+  until?: string;
 };
 
 type AvailabilitySlot = {
@@ -69,6 +71,14 @@ function formatAddress(booking: Booking): string {
     .trim();
 }
 
+function recurrenceLabel(entry: AvailabilityEntry): string {
+  const repeat = entry.repeat || 'none';
+  if (repeat === 'daily') return `Daily${entry.until ? ` until ${entry.until}` : ''}`;
+  if (repeat === 'weekly') return `Weekly${entry.until ? ` until ${entry.until}` : ''}`;
+  if (repeat === 'weekdays') return `Weekdays${entry.until ? ` until ${entry.until}` : ''}`;
+  return 'One-time';
+}
+
 export default function EmployeeCalendarPage() {
   const [user, setUser] = useState<User | null>(null);
   const [entries, setEntries] = useState<AvailabilityEntry[]>([]);
@@ -85,6 +95,8 @@ export default function EmployeeCalendarPage() {
   const [newStart, setNewStart] = useState('08:00');
   const [newEnd, setNewEnd] = useState('17:00');
   const [newType, setNewType] = useState<'open' | 'blocked'>('blocked');
+  const [newRepeat, setNewRepeat] = useState<'none' | 'daily' | 'weekly' | 'weekdays'>('none');
+  const [newUntil, setNewUntil] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -191,7 +203,19 @@ export default function EmployeeCalendarPage() {
       return;
     }
 
-    const next = [...entries, { date: newDate, start: newStart, end: newEnd, type: newType }];
+    if (newRepeat !== 'none' && newUntil && newUntil < newDate) {
+      setError('Recurring end date must be the same day or later than the start date.');
+      return;
+    }
+
+    const next = [...entries, {
+      date: newDate,
+      start: newStart,
+      end: newEnd,
+      type: newType,
+      repeat: newRepeat,
+      until: newRepeat === 'none' ? undefined : (newUntil || undefined),
+    }];
     setEntries(next);
   };
 
@@ -265,7 +289,7 @@ export default function EmployeeCalendarPage() {
 
         <section className="bg-white rounded-lg shadow p-6 space-y-4">
           <h2 className="text-lg font-bold text-gray-900">Add Calendar Entry</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <input
               type="date"
               value={newDate}
@@ -292,6 +316,34 @@ export default function EmployeeCalendarPage() {
               <option value="blocked">Blocked (cannot work)</option>
               <option value="open">Open (can work)</option>
             </select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <select
+              value={newRepeat}
+              onChange={(e) => setNewRepeat((['none', 'daily', 'weekly', 'weekdays'].includes(e.target.value) ? e.target.value : 'none') as 'none' | 'daily' | 'weekly' | 'weekdays')}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+            >
+              <option value="none">One-time</option>
+              <option value="daily">Repeat Daily</option>
+              <option value="weekly">Repeat Weekly</option>
+              <option value="weekdays">Repeat Weekdays</option>
+            </select>
+
+            <input
+              type="date"
+              value={newUntil}
+              onChange={(e) => setNewUntil(e.target.value)}
+              disabled={newRepeat === 'none'}
+              min={newDate}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm disabled:bg-gray-100"
+            />
+
+            <div className="text-xs text-gray-600 border border-gray-200 rounded-md px-3 py-2 bg-gray-50 flex items-center">
+              {newRepeat === 'none'
+                ? 'This entry applies once.'
+                : `Recurs ${newRepeat}${newUntil ? ` until ${newUntil}` : ' with no end date'}.`}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -397,6 +449,7 @@ export default function EmployeeCalendarPage() {
                     <span className={entry.type === 'blocked' ? 'text-red-700 font-medium' : 'text-green-700 font-medium'}>
                       {entry.type === 'blocked' ? 'Blocked' : 'Open'}
                     </span>
+                    <p className="text-xs text-gray-500 mt-1">{recurrenceLabel(entry)}</p>
                   </div>
                   <button
                     onClick={() => removeEntry(index)}

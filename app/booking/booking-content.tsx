@@ -152,6 +152,10 @@ export default function BookingContent() {
       throw new Error(body?.error || 'Failed to load availability');
     }
 
+    if (body?.warning) {
+      setAvailabilityError(String(body.warning));
+    }
+
     return Array.isArray(body?.slots) ? (body.slots as AvailabilitySlot[]) : [];
   }, []);
 
@@ -163,7 +167,6 @@ export default function BookingContent() {
     }
 
     setAvailabilityLoading(true);
-    setAvailabilityError('');
     try {
       const slots = await fetchAvailabilityForDate(date);
       setAvailabilitySlots(slots);
@@ -200,7 +203,6 @@ export default function BookingContent() {
   useEffect(() => {
     const bootstrapSoonestOpen = async () => {
       setAvailabilityLoading(true);
-      setAvailabilityError('');
       try {
         const openDates = await loadUpcomingOpenDates(minimumScheduleDate);
         setQuickSelectDates(openDates.slice(1, 4).map((entry) => entry.date));
