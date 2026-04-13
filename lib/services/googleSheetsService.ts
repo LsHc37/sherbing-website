@@ -551,7 +551,7 @@ export async function getBookingAvailabilityForDate(date: string): Promise<Booki
     status: (() => {
       const blockedByBooking = bookedTimes.has(time);
       const blockedByCalendar = blockedWindows.some((entry) => isTimeWithinRange(time, entry.start, entry.end));
-      const withinOpenWindow = !hasOpenWindows || openWindows.some((entry) => isTimeWithinRange(time, entry.start, entry.end));
+      const withinOpenWindow = hasOpenWindows && openWindows.some((entry) => isTimeWithinRange(time, entry.start, entry.end));
       return blockedByBooking || blockedByCalendar || !withinOpenWindow ? 'booked' : 'open';
     })(),
   }));

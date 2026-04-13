@@ -36,6 +36,16 @@ type Booking = {
   created_at: string;
 };
 
+async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...(init || {}), signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
 }
@@ -227,7 +237,7 @@ export default function EmployeeDashboardPage() {
     setError('');
 
     try {
-      const meRes = await fetch('/api/auth/me');
+      const meRes = await fetchWithTimeout('/api/auth/me');
       if (!meRes.ok) {
         window.location.href = '/login';
         return;
@@ -242,7 +252,7 @@ export default function EmployeeDashboardPage() {
 
       setUser(me);
 
-      const bookingsRes = await fetch('/api/bookings/list');
+      const bookingsRes = await fetchWithTimeout('/api/bookings/list');
       if (!bookingsRes.ok) {
         const body = await bookingsRes.json().catch(() => ({}));
         throw new Error(body?.error || 'Failed to load bookings');
@@ -251,7 +261,11 @@ export default function EmployeeDashboardPage() {
       const data = (await bookingsRes.json()) as Booking[];
       setBookings(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard');
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Dashboard request timed out. Please refresh and try again.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard');
+      }
     } finally {
       setLoading(false);
     }
@@ -322,7 +336,16 @@ export default function EmployeeDashboardPage() {
   };
 
   if (loading) {
-    return <main className="min-h-screen bg-gray-50 p-8">Loading employee dashboard...</main>;
+    return (
+      <main className="min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 py-16">
+          <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
+            <h1 className="text-xl font-semibold text-gray-900">Loading employee dashboard...</h1>
+            <p className="text-sm text-gray-600 mt-2">Fetching your bookings and schedule details.</p>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (

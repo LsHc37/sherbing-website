@@ -17,15 +17,71 @@ type AvailabilityEntry = {
   type: 'open' | 'blocked';
 };
 
+type AvailabilitySlot = {
+  time: string;
+  status: 'open' | 'booked';
+};
+
+type Booking = {
+  id: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  service_id: string;
+  address: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  scheduled_date?: string;
+  scheduled_time?: string;
+  status: string;
+  assigned_employee: string;
+};
+
+function getDefaultDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function prettyStatus(status: string): string {
+  return String(status || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (s) => s.toUpperCase());
+}
+
+function prettyService(serviceId: string): string {
+  return String(serviceId || '')
+    .split(',')
+    .map((s) => prettyStatus(s.trim()))
+    .filter(Boolean)
+    .join(', ');
+}
+
+function formatAddress(booking: Booking): string {
+  return [
+    booking.address,
+    [booking.city, booking.state].filter(Boolean).join(', '),
+    booking.zip_code,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+}
+
 export default function EmployeeCalendarPage() {
   const [user, setUser] = useState<User | null>(null);
   const [entries, setEntries] = useState<AvailabilityEntry[]>([]);
+  const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const [newDate, setNewDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState(getDefaultDate());
+  const [newDate, setNewDate] = useState(getDefaultDate());
   const [newStart, setNewStart] = useState('08:00');
   const [newEnd, setNewEnd] = useState('17:00');
   const [newType, setNewType] = useState<'open' | 'blocked'>('blocked');
@@ -57,6 +113,13 @@ export default function EmployeeCalendarPage() {
 
       const list = Array.isArray(body?.entries) ? (body.entries as AvailabilityEntry[]) : [];
       setEntries(list);
+
+      const bookingsRes = await fetch('/api/bookings/list');
+      const bookingsBody = await bookingsRes.json().catch(() => ([]));
+      if (!bookingsRes.ok) {
+        throw new Error('Failed to load bookings for calendar');
+      }
+      setBookings(Array.isArray(bookingsBody) ? (bookingsBody as Booking[]) : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load calendar settings');
     } finally {
@@ -64,13 +127,52 @@ export default function EmployeeCalendarPage() {
     }
   };
 
+  const loadDateSlots = async (date: string) => {
+    if (!date) {
+      setSlots([]);
+      return;
+    }
+
+    setSlotsLoading(true);
+    try {
+      const response = await fetch(`/api/bookings/availability?date=${encodeURIComponent(date)}`);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body?.error || 'Failed to load day slots');
+      }
+      const nextSlots = Array.isArray(body?.slots) ? (body.slots as AvailabilitySlot[]) : [];
+      setSlots(nextSlots);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load day slots');
+      setSlots([]);
+    } finally {
+      setSlotsLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadData();
   }, []);
 
+  useEffect(() => {
+    void loadDateSlots(selectedDate);
+  }, [selectedDate]);
+
   const sortedEntries = useMemo(() => {
     return [...entries].sort((a, b) => `${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`));
   }, [entries]);
+
+  const dayBookingsByTime = useMemo(() => {
+    const map = new Map<string, Booking[]>();
+    const dayBookings = bookings.filter((booking) => booking.scheduled_date === selectedDate && booking.scheduled_time);
+    for (const booking of dayBookings) {
+      const key = booking.scheduled_time || '';
+      const existing = map.get(key) || [];
+      existing.push(booking);
+      map.set(key, existing);
+    }
+    return map;
+  }, [bookings, selectedDate]);
 
   const addEntry = () => {
     setError('');
@@ -113,6 +215,7 @@ export default function EmployeeCalendarPage() {
 
       setMessage('Calendar openings/blockouts saved successfully.');
       await loadData();
+      await loadDateSlots(selectedDate);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save calendar settings');
     } finally {
@@ -200,6 +303,61 @@ export default function EmployeeCalendarPage() {
               {saving ? 'Saving...' : 'Save Calendar'}
             </button>
           </div>
+        </section>
+
+        <section className="bg-white rounded-lg shadow p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-lg font-bold text-gray-900">Daily Schedule View</h2>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+            />
+          </div>
+          <p className="text-sm text-gray-600">
+            This view shows exactly what customers see as open/booked, plus customer details for booked times.
+          </p>
+
+          {slotsLoading ? (
+            <p className="text-sm text-gray-600">Loading day schedule...</p>
+          ) : slots.length === 0 ? (
+            <p className="text-sm text-gray-600">No time slots configured for this day yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {slots.map((slot) => {
+                const bookingsAtTime = dayBookingsByTime.get(slot.time) || [];
+                const isOpen = slot.status === 'open';
+                return (
+                  <div key={slot.time} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-semibold text-gray-900">{slot.time}</p>
+                      <span className={isOpen ? 'text-green-700 text-sm font-medium' : 'text-red-700 text-sm font-medium'}>
+                        {isOpen ? 'Open' : 'Booked / Unavailable'}
+                      </span>
+                    </div>
+
+                    {bookingsAtTime.length === 0 ? (
+                      <p className="text-xs text-gray-600 mt-2">No customer booking at this time.</p>
+                    ) : (
+                      <div className="mt-3 space-y-3">
+                        {bookingsAtTime.map((booking) => (
+                          <div key={booking.id} className="rounded border border-gray-200 bg-white p-3">
+                            <p className="text-sm font-semibold text-gray-900">{booking.customer_name || 'Customer'}</p>
+                            <p className="text-xs text-gray-600">{prettyService(booking.service_id)}</p>
+                            <p className="text-xs text-gray-600">Status: {prettyStatus(booking.status)}</p>
+                            <p className="text-xs text-gray-600">Phone: {booking.customer_phone || 'N/A'}</p>
+                            <p className="text-xs text-gray-600">Email: {booking.customer_email || 'N/A'}</p>
+                            <p className="text-xs text-gray-600">Address: {formatAddress(booking) || 'N/A'}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         <section className="bg-white rounded-lg shadow overflow-hidden">
