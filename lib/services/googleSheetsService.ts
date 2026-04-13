@@ -405,6 +405,13 @@ export type BookingAvailabilitySlot = {
   status: SlotStatus;
 };
 
+export type EmployeeAvailabilityEntry = {
+  date: string;
+  start: string;
+  end: string;
+  type: 'open' | 'blocked';
+};
+
 const DEFAULT_BOOKING_TIME_SLOTS = [
   '08:00',
   '09:00',
@@ -458,6 +465,60 @@ function isBookingBlockingSlot(status?: string) {
   return String(status || '').toLowerCase() !== 'cancelled';
 }
 
+function compareTimeStrings(a: string, b: string) {
+  return normalizeTimeString(a).localeCompare(normalizeTimeString(b));
+}
+
+function isTimeWithinRange(time: string, start: string, end: string) {
+  const normalizedTime = normalizeTimeString(time);
+  const normalizedStart = normalizeTimeString(start);
+  const normalizedEnd = normalizeTimeString(end);
+
+  if (!normalizedTime || !normalizedStart || !normalizedEnd) return false;
+  return compareTimeStrings(normalizedTime, normalizedStart) >= 0
+    && compareTimeStrings(normalizedTime, normalizedEnd) < 0;
+}
+
+export function parseEmployeeAvailabilityEntries(raw: string | undefined): EmployeeAvailabilityEntry[] {
+  const value = String(raw || '').trim();
+  if (!value) return [];
+
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [rawDate, rawStart, rawEnd, rawType] = entry.split('|').map((part) => part.trim());
+      const date = normalizeDateString(rawDate);
+
+      // Support legacy date-only entries as full-day open availability.
+      if (!rawStart && !rawEnd && !rawType && date) {
+        return {
+          date,
+          start: '00:00',
+          end: '23:59',
+          type: 'open' as const,
+        };
+      }
+
+      const start = normalizeTimeString(rawStart || '');
+      const end = normalizeTimeString(rawEnd || '');
+      const type = rawType === 'blocked' ? 'blocked' : 'open';
+
+      if (!date || !start || !end || compareTimeStrings(start, end) >= 0) {
+        return null;
+      }
+
+      return {
+        date,
+        start,
+        end,
+        type,
+      };
+    })
+    .filter((entry): entry is EmployeeAvailabilityEntry => Boolean(entry));
+}
+
 export async function getBookingAvailabilityForDate(date: string): Promise<BookingAvailabilitySlot[]> {
   const targetDate = normalizeDateString(date);
   if (!targetDate) {
@@ -465,6 +526,7 @@ export async function getBookingAvailabilityForDate(date: string): Promise<Booki
   }
 
   const bookings = await listBookingsFromSheet();
+  const users = await listUsersFromSheet();
   const bookedTimes = new Set(
     bookings
       .filter((booking) => normalizeDateString(booking.scheduled_date) === targetDate)
@@ -473,9 +535,25 @@ export async function getBookingAvailabilityForDate(date: string): Promise<Booki
       .filter(Boolean)
   );
 
+  const activeWorkers = users.filter((user) => {
+    const role = String(user.role || '').toLowerCase();
+    const isActive = String(user.active || 'true').toLowerCase() !== 'false';
+    return isActive && (role === 'employee' || role === 'admin');
+  });
+
+  const allEntries = activeWorkers.flatMap((worker) => parseEmployeeAvailabilityEntries(worker.available_dates));
+  const openWindows = allEntries.filter((entry) => entry.date === targetDate && entry.type === 'open');
+  const blockedWindows = allEntries.filter((entry) => entry.date === targetDate && entry.type === 'blocked');
+  const hasOpenWindows = openWindows.length > 0;
+
   return DEFAULT_BOOKING_TIME_SLOTS.map((time) => ({
     time,
-    status: bookedTimes.has(time) ? 'booked' : 'open',
+    status: (() => {
+      const blockedByBooking = bookedTimes.has(time);
+      const blockedByCalendar = blockedWindows.some((entry) => isTimeWithinRange(time, entry.start, entry.end));
+      const withinOpenWindow = !hasOpenWindows || openWindows.some((entry) => isTimeWithinRange(time, entry.start, entry.end));
+      return blockedByBooking || blockedByCalendar || !withinOpenWindow ? 'booked' : 'open';
+    })(),
   }));
 }
 

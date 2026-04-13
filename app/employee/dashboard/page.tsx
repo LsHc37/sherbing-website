@@ -36,9 +36,6 @@ type Booking = {
   created_at: string;
 };
 
-const OPEN_JOB_STATUSES = new Set(['pending', 'confirmed', 'change_requested']);
-const FINAL_STATUSES = new Set(['completed', 'cancelled']);
-
 function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
 }
@@ -108,21 +105,12 @@ function includesSearchTerm(booking: Booking, term: string): boolean {
 
 type BookingCardProps = {
   booking: Booking;
-  userEmail: string;
-  canManageAll: boolean;
   actionLoading: string | null;
-  onMarkStatus: (bookingId: string, status: string) => Promise<void>;
   onUpdateSchedule: (bookingId: string, scheduledDate: string, scheduledTime: string) => Promise<void>;
 };
 
-function BookingCard({ booking, userEmail, canManageAll, actionLoading, onMarkStatus, onUpdateSchedule }: BookingCardProps) {
-  const normalizedAssignee = String(booking.assigned_employee || '').toLowerCase();
-  const claimedByCurrentUser = normalizedAssignee && normalizedAssignee === userEmail;
-  const claimedByOther = normalizedAssignee && normalizedAssignee !== userEmail;
+function BookingCard({ booking, actionLoading, onUpdateSchedule }: BookingCardProps) {
   const services = parseServices(booking.service_id);
-  const canClaim = !normalizedAssignee && booking.status === 'pending';
-  const canComplete = claimedByCurrentUser && !FINAL_STATUSES.has(booking.status);
-  const canEditSchedule = canManageAll || claimedByCurrentUser;
   const [scheduledDateDraft, setScheduledDateDraft] = useState(booking.scheduled_date || '');
   const [scheduledTimeDraft, setScheduledTimeDraft] = useState(booking.scheduled_time || '');
 
@@ -135,12 +123,6 @@ function BookingCard({ booking, userEmail, canManageAll, actionLoading, onMarkSt
             <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusClass(booking.status)}`}>
               {prettyStatus(booking.status)}
             </span>
-            {claimedByCurrentUser && (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Assigned to you</span>
-            )}
-            {claimedByOther && (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Assigned to {booking.assigned_employee}</span>
-            )}
           </div>
 
           <p className="text-xs text-gray-500">
@@ -161,29 +143,27 @@ function BookingCard({ booking, userEmail, canManageAll, actionLoading, onMarkSt
             <p><span className="font-medium text-gray-800">Package:</span> {booking.package_id ? prettyStatus(booking.package_id) : 'N/A'}</p>
           </div>
 
-          {canEditSchedule && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-2xl">
-              <input
-                type="date"
-                value={scheduledDateDraft}
-                onChange={(event) => setScheduledDateDraft(event.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-              />
-              <input
-                type="time"
-                value={scheduledTimeDraft}
-                onChange={(event) => setScheduledTimeDraft(event.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-              />
-              <button
-                onClick={() => void onUpdateSchedule(booking.id, scheduledDateDraft, scheduledTimeDraft)}
-                disabled={actionLoading === booking.id + 'schedule'}
-                className="px-3 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {actionLoading === booking.id + 'schedule' ? 'Saving...' : 'Save Schedule'}
-              </button>
-            </div>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-2xl">
+            <input
+              type="date"
+              value={scheduledDateDraft}
+              onChange={(event) => setScheduledDateDraft(event.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+            />
+            <input
+              type="time"
+              value={scheduledTimeDraft}
+              onChange={(event) => setScheduledTimeDraft(event.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+            />
+            <button
+              onClick={() => void onUpdateSchedule(booking.id, scheduledDateDraft, scheduledTimeDraft)}
+              disabled={actionLoading === booking.id + 'schedule'}
+              className="px-3 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {actionLoading === booking.id + 'schedule' ? 'Saving...' : 'Save Schedule'}
+            </button>
+          </div>
 
           <div className="flex flex-wrap gap-2">
             <a
@@ -227,82 +207,9 @@ function BookingCard({ booking, userEmail, canManageAll, actionLoading, onMarkSt
             <span className="text-gray-700 font-medium">Employee Earns</span>
             <span className="font-bold text-green-600">{formatMoney(Number(booking.employee_payout || 0))}</span>
           </div>
-
-          <div className="pt-3 flex flex-wrap gap-2">
-            {canClaim && (
-              <button
-                onClick={() => void onMarkStatus(booking.id, 'confirmed')}
-                disabled={actionLoading === booking.id + 'confirmed'}
-                className="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
-              >
-                {actionLoading === booking.id + 'confirmed' ? 'Claiming...' : 'Claim Job'}
-              </button>
-            )}
-
-            {canComplete && (
-              <button
-                onClick={() => void onMarkStatus(booking.id, 'completed')}
-                disabled={actionLoading === booking.id + 'completed'}
-                className="px-3 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 disabled:opacity-50"
-              >
-                {actionLoading === booking.id + 'completed' ? 'Updating...' : 'Mark Completed'}
-              </button>
-            )}
-          </div>
         </div>
       </div>
     </article>
-  );
-}
-
-type BookingSectionProps = {
-  title: string;
-  subtitle: string;
-  bookings: Booking[];
-  emptyMessage: string;
-  userEmail: string;
-  canManageAll: boolean;
-  actionLoading: string | null;
-  onMarkStatus: (bookingId: string, status: string) => Promise<void>;
-  onUpdateSchedule: (bookingId: string, scheduledDate: string, scheduledTime: string) => Promise<void>;
-};
-
-function BookingSection({
-  title,
-  subtitle,
-  bookings,
-  emptyMessage,
-  userEmail,
-  canManageAll,
-  actionLoading,
-  onMarkStatus,
-  onUpdateSchedule,
-}: BookingSectionProps) {
-  return (
-    <section className="bg-white rounded-lg shadow">
-      <div className="p-6 border-b">
-        <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-        <p className="text-sm text-gray-600 mt-1">{subtitle}</p>
-      </div>
-
-      {bookings.length === 0 ? (
-        <div className="p-6 text-gray-600">{emptyMessage}</div>
-      ) : (
-        <div className="divide-y">
-          {bookings.map((booking) => (
-            <BookingCard
-              key={`${booking.id}-${booking.scheduled_date || ''}-${booking.scheduled_time || ''}`}
-              booking={booking}
-              userEmail={userEmail}
-              canManageAll={canManageAll}
-              actionLoading={actionLoading}
-              onMarkStatus={onMarkStatus}
-              onUpdateSchedule={onUpdateSchedule}
-            />
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -354,112 +261,23 @@ export default function EmployeeDashboardPage() {
     void loadData();
   }, []);
 
-  const normalizedUserEmail = String(user?.email || '').toLowerCase();
-
-  const openJobs = useMemo(() => {
-    return bookings.filter((booking) => OPEN_JOB_STATUSES.has(booking.status));
-  }, [bookings]);
-
-  const historyJobs = useMemo(() => {
-    return bookings.filter((booking) => !OPEN_JOB_STATUSES.has(booking.status));
-  }, [bookings]);
-
-  const claimedByMe = useMemo(() => {
-    if (!user) return [];
-    return openJobs.filter((booking) => String(booking.assigned_employee || '').toLowerCase() === normalizedUserEmail);
-  }, [normalizedUserEmail, openJobs, user]);
-
-  const unclaimedOpenJobs = useMemo(() => {
-    return openJobs.filter((booking) => !booking.assigned_employee);
-  }, [openJobs]);
-
-  const assignedToOthers = useMemo(() => {
-    if (!user) return [];
-    return openJobs.filter((booking) => {
-      const assignee = String(booking.assigned_employee || '').toLowerCase();
-      return assignee && assignee !== normalizedUserEmail;
-    });
-  }, [normalizedUserEmail, openJobs, user]);
-
-  const myCompletedJobs = useMemo(() => {
-    if (!user) return [];
-    return historyJobs.filter((booking) => (
-      booking.status === 'completed' && String(booking.assigned_employee || '').toLowerCase() === normalizedUserEmail
-    ));
-  }, [historyJobs, normalizedUserEmail, user]);
-
-  const otherHistory = useMemo(() => {
-    if (!user) return [];
-    return historyJobs.filter((booking) => !myCompletedJobs.some((myBooking) => myBooking.id === booking.id));
-  }, [historyJobs, myCompletedJobs, user]);
-
-  const openPayoutTotal = useMemo(() => {
-    return claimedByMe.reduce((sum, booking) => sum + Number(booking.employee_payout || 0), 0);
-  }, [claimedByMe]);
-
-  const completedPayoutTotal = useMemo(() => {
-    return myCompletedJobs.reduce((sum, booking) => sum + Number(booking.employee_payout || 0), 0);
-  }, [myCompletedJobs]);
-
-  const filteredUnclaimedOpenJobs = useMemo(() => {
-    return unclaimedOpenJobs.filter((booking) => includesSearchTerm(booking, searchTerm));
-  }, [searchTerm, unclaimedOpenJobs]);
-
-  const filteredClaimedByMe = useMemo(() => {
-    return claimedByMe.filter((booking) => includesSearchTerm(booking, searchTerm));
-  }, [claimedByMe, searchTerm]);
-
-  const filteredAssignedToOthers = useMemo(() => {
-    return assignedToOthers.filter((booking) => includesSearchTerm(booking, searchTerm));
-  }, [assignedToOthers, searchTerm]);
-
-  const filteredMyCompletedJobs = useMemo(() => {
-    return myCompletedJobs.filter((booking) => includesSearchTerm(booking, searchTerm));
-  }, [myCompletedJobs, searchTerm]);
-
-  const filteredOtherHistory = useMemo(() => {
-    return otherHistory.filter((booking) => includesSearchTerm(booking, searchTerm));
-  }, [otherHistory, searchTerm]);
-
-  const markStatus = async (bookingId: string, status: string): Promise<void> => {
-    setActionLoading(bookingId + status);
-    setError('');
-    setMessage('');
-
-    try {
-      const response = await fetch(`/api/bookings/${bookingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+  const filteredBookings = useMemo(() => {
+    return bookings
+      .filter((booking) => includesSearchTerm(booking, searchTerm))
+      .sort((a, b) => {
+        const aDate = `${a.scheduled_date || '9999-12-31'} ${a.scheduled_time || '23:59'}`;
+        const bDate = `${b.scheduled_date || '9999-12-31'} ${b.scheduled_time || '23:59'}`;
+        return aDate.localeCompare(bDate);
       });
+  }, [bookings, searchTerm]);
 
-      const raw = await response.text();
-      let body: { error?: string } = {};
-      if (raw) {
-        try {
-          body = JSON.parse(raw) as { error?: string };
-        } catch {
-          body = {};
-        }
-      }
-      if (!response.ok) {
-        throw new Error(body?.error || 'Failed to update booking');
-      }
+  const scheduledCount = useMemo(() => {
+    return bookings.filter((booking) => Boolean(booking.scheduled_date && booking.scheduled_time)).length;
+  }, [bookings]);
 
-      if (status === 'confirmed') {
-        setMessage('Job claimed successfully.');
-      } else if (status === 'completed') {
-        setMessage('Job marked as completed.');
-      } else {
-        setMessage('Booking updated successfully.');
-      }
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Action failed');
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  const payoutTotal = useMemo(() => {
+    return bookings.reduce((sum, booking) => sum + Number(booking.employee_payout || 0), 0);
+  }, [bookings]);
 
   const updateSchedule = async (bookingId: string, scheduledDate: string, scheduledTime: string): Promise<void> => {
     setActionLoading(bookingId + 'schedule');
@@ -516,6 +334,8 @@ export default function EmployeeDashboardPage() {
             <span className="text-sm text-gray-500">Employee Dashboard</span>
           </div>
           <div className="flex items-center gap-4 text-sm sm:text-base">
+            <Link href="/employee/dashboard" className="text-gray-700 hover:text-gray-900">Bookings</Link>
+            <Link href="/employee/calendar" className="text-gray-700 hover:text-gray-900">Calendar</Link>
             {user?.role === 'admin' && <Link href="/admin/users" className="text-gray-700 hover:text-gray-900">Manage Users</Link>}
             {user?.role === 'admin' && <Link href="/admin/booking" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>}
             <button onClick={logout} className="text-gray-700 hover:text-gray-900">Logout</button>
@@ -524,33 +344,22 @@ export default function EmployeeDashboardPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-        <div className="bg-white rounded-lg shadow p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg shadow p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <p className="text-sm text-gray-500">Signed In As</p>
             <p className="text-lg font-semibold text-gray-900">{user?.full_name || user?.email}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Open Jobs (Unclaimed)</p>
-            <p className="text-2xl font-bold text-gray-900">{unclaimedOpenJobs.length}</p>
+            <p className="text-sm text-gray-500">Total Bookings</p>
+            <p className="text-2xl font-bold text-gray-900">{bookings.length}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Your Open Earnings</p>
-            <p className="text-2xl font-bold text-green-600">{formatMoney(openPayoutTotal)}</p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <p className="text-sm text-gray-500">Your Active Jobs</p>
-            <p className="text-2xl font-bold text-gray-900">{claimedByMe.length}</p>
+            <p className="text-sm text-gray-500">Scheduled Bookings</p>
+            <p className="text-2xl font-bold text-gray-900">{scheduledCount}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Team Assigned Open Jobs</p>
-            <p className="text-2xl font-bold text-gray-900">{assignedToOthers.length}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Your Completed Earnings</p>
-            <p className="text-2xl font-bold text-emerald-600">{formatMoney(completedPayoutTotal)}</p>
+            <p className="text-sm text-gray-500">Total Potential Earnings</p>
+            <p className="text-2xl font-bold text-green-600">{formatMoney(payoutTotal)}</p>
           </div>
         </div>
 
@@ -576,65 +385,27 @@ export default function EmployeeDashboardPage() {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700">{message}</div>
         )}
 
-        <BookingSection
-          title="My Active Jobs"
-          subtitle="These jobs are assigned to you and still in progress."
-          bookings={filteredClaimedByMe}
-          emptyMessage="No active jobs assigned to you right now."
-          userEmail={normalizedUserEmail}
-          canManageAll={user?.role === 'admin'}
-          actionLoading={actionLoading}
-          onMarkStatus={markStatus}
-          onUpdateSchedule={updateSchedule}
-        />
+        <section className="bg-white rounded-lg shadow">
+          <div className="p-6 border-b">
+            <h2 className="text-xl font-bold text-gray-900">All Bookings</h2>
+            <p className="text-sm text-gray-600 mt-1">View all job details in one place and update schedule times directly.</p>
+          </div>
 
-        <BookingSection
-          title="Available Jobs"
-          subtitle="Claim a pending booking when you are ready to take it."
-          bookings={filteredUnclaimedOpenJobs}
-          emptyMessage="No unclaimed jobs are available right now."
-          userEmail={normalizedUserEmail}
-          canManageAll={user?.role === 'admin'}
-          actionLoading={actionLoading}
-          onMarkStatus={markStatus}
-          onUpdateSchedule={updateSchedule}
-        />
-
-        <BookingSection
-          title="Team Assigned Open Jobs"
-          subtitle="Open jobs currently assigned to another team member."
-          bookings={filteredAssignedToOthers}
-          emptyMessage="No team-assigned open jobs right now."
-          userEmail={normalizedUserEmail}
-          canManageAll={user?.role === 'admin'}
-          actionLoading={actionLoading}
-          onMarkStatus={markStatus}
-          onUpdateSchedule={updateSchedule}
-        />
-
-        <BookingSection
-          title="My Completed Jobs"
-          subtitle="Completed work history with full customer and payout details."
-          bookings={filteredMyCompletedJobs}
-          emptyMessage="No completed jobs recorded for your account yet."
-          userEmail={normalizedUserEmail}
-          canManageAll={user?.role === 'admin'}
-          actionLoading={actionLoading}
-          onMarkStatus={markStatus}
-          onUpdateSchedule={updateSchedule}
-        />
-
-        <BookingSection
-          title="Other History"
-          subtitle="Closed jobs from the rest of the team for full visibility."
-          bookings={filteredOtherHistory}
-          emptyMessage="No additional booking history found."
-          userEmail={normalizedUserEmail}
-          canManageAll={user?.role === 'admin'}
-          actionLoading={actionLoading}
-          onMarkStatus={markStatus}
-          onUpdateSchedule={updateSchedule}
-        />
+          {filteredBookings.length === 0 ? (
+            <div className="p-6 text-gray-600">No bookings found.</div>
+          ) : (
+            <div className="divide-y">
+              {filteredBookings.map((booking) => (
+                <BookingCard
+                  key={`${booking.id}-${booking.scheduled_date || ''}-${booking.scheduled_time || ''}`}
+                  booking={booking}
+                  actionLoading={actionLoading}
+                  onUpdateSchedule={updateSchedule}
+                />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

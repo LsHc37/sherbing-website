@@ -58,9 +58,12 @@ export async function PATCH(
         }
       }
 
+      const shouldAutoAssignToEmployee = session.role === 'employee' && status === 'confirmed';
       const resolvedAssignedEmployee = session.role === 'admin'
         ? assignedEmployee
-        : session.email;
+        : shouldAutoAssignToEmployee
+          ? session.email
+          : undefined;
 
       const result = await updateBookingInSheet(bookingId, {
         status,
