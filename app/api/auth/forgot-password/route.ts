@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findUserByEmail, initializeSheet, updateUserInSheet } from '@/lib/services/googleSheetsService';
 import { sendPasswordResetEmail } from '@/lib/services/bookingService';
+import { checkRateLimit, getRequestIp } from '@/lib/services/rateLimitService';
 import crypto from 'crypto';
 
 function generateResetToken(): string {
@@ -51,6 +52,16 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
+    const ip = getRequestIp(request);
+    const ipLimit = checkRateLimit(`forgot-password:ip:${ip}`, 10, 15 * 60 * 1000);
+    const emailLimit = checkRateLimit(`forgot-password:email:${normalizedEmail}`, 3, 15 * 60 * 1000);
+    if (!ipLimit.allowed || !emailLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many reset attempts. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
     const user = await findUserByEmail(normalizedEmail);
 
     // Always return success for security (don't reveal if email exists)

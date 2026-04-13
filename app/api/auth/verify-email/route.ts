@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getVerificationCookieName, verifyVerificationToken } from '@/lib/auth/session';
 import { findUserByEmail, updateUserInSheet } from '@/lib/services/googleSheetsService';
+import { checkRateLimit, getRequestIp } from '@/lib/services/rateLimitService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,6 +9,20 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = String(email || '').trim().toLowerCase();
     const normalizedCode = String(code || '').trim();
     const verificationCookie = verifyVerificationToken(request.cookies.get(getVerificationCookieName())?.value || null);
+
+    const ip = getRequestIp(request);
+    const ipLimit = checkRateLimit(`verify-email:ip:${ip}`, 30, 15 * 60 * 1000);
+    const emailLimit = checkRateLimit(`verify-email:email:${normalizedEmail}`, 8, 15 * 60 * 1000);
+    if (!ipLimit.allowed || !emailLimit.allowed) {
+      return NextResponse.json({ error: 'Too many verification attempts. Please try again later.' }, { status: 429 });
+    }
+    if (verificationCookie && verificationCookie.email.toLowerCase() !== normalizedEmail) {
+      return NextResponse.json(
+        { error: 'Verification context does not match this email' },
+        { status: 400 }
+      );
+    }
+
 
     if (!normalizedEmail || !normalizedCode) {
       return NextResponse.json(
@@ -35,13 +50,7 @@ export async function POST(request: NextRequest) {
 
     // Check if code matches
     const storedCode = String(user.email_verification_code || '').trim();
-    const cookieMatches = Boolean(
-      verificationCookie &&
-      verificationCookie.email.toLowerCase() === normalizedEmail &&
-      verificationCookie.code.trim() === normalizedCode
-    );
-
-    if (storedCode !== normalizedCode && !cookieMatches) {
+    if (storedCode !== normalizedCode) {
       return NextResponse.json(
         { error: 'Invalid verification code' },
         { status: 400 }

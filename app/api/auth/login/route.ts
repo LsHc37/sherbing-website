@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSessionToken, getSessionCookieName, getSessionCookieSettings, getSessionMaxAgeSeconds, hashPassword } from '@/lib/auth/session';
+import {
+  createSessionToken,
+  getSessionCookieName,
+  getSessionCookieSettings,
+  getSessionMaxAgeSeconds,
+  hashPassword,
+  isAdminEmail,
+  verifyPassword,
+} from '@/lib/auth/session';
 import { findUserByEmail, updateUserInSheet } from '@/lib/services/googleSheetsService';
+import { checkRateLimit, getRequestIp } from '@/lib/services/rateLimitService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,9 +24,16 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
+    const ip = getRequestIp(request);
+    const ipLimit = checkRateLimit(`login:ip:${ip}`, 20, 15 * 60 * 1000);
+    const accountLimit = checkRateLimit(`login:account:${normalizedEmail}`, 8, 15 * 60 * 1000);
+    if (!ipLimit.allowed || !accountLimit.allowed) {
+      return NextResponse.json({ error: 'Too many login attempts. Please try again later.' }, { status: 429 });
+    }
+
     const user = await findUserByEmail(normalizedEmail);
     if (!user) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
     // User rows store email_verified as "true" | "false" strings.
@@ -29,13 +45,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const passwordHash = hashPassword(password);
-    if (user.password_hash !== passwordHash) {
-      return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+    const isPasswordValid = await verifyPassword(password, user.password_hash);
+    if (!isPasswordValid) {
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
-    const adminEmails = new Set(['lucas.mellen1@gmail.com', 'lucanmellen1@gmail.com']);
-    const resolvedRole = adminEmails.has(normalizedEmail) ? 'admin' : user.role;
+    if (!user.password_hash.startsWith('$2')) {
+      await updateUserInSheet(normalizedEmail, { password_hash: await hashPassword(password) });
+    }
+
+    const resolvedRole = isAdminEmail(normalizedEmail) ? 'admin' : user.role;
 
     if (resolvedRole === 'admin' && user.role !== 'admin') {
       await updateUserInSheet(normalizedEmail, { role: 'admin' });

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Logo from '@/app/components/Logo';
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 type User = {
   email: string;
@@ -80,6 +81,7 @@ function recurrenceLabel(entry: AvailabilityEntry): string {
 }
 
 export default function EmployeeCalendarPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [entries, setEntries] = useState<AvailabilityEntry[]>([]);
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
@@ -97,6 +99,36 @@ export default function EmployeeCalendarPage() {
   const [newType, setNewType] = useState<'open' | 'blocked'>('blocked');
   const [newRepeat, setNewRepeat] = useState<'none' | 'daily' | 'weekly' | 'weekdays'>('none');
   const [newUntil, setNewUntil] = useState('');
+
+  const persistEntries = async (nextEntries: AvailabilityEntry[]) => {
+    setSaving(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/employee/availability', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: nextEntries }),
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body?.error || 'Failed to save calendar settings');
+      }
+
+      setEntries(Array.isArray(body?.entries) ? (body.entries as AvailabilityEntry[]) : nextEntries);
+      setMessage('Calendar openings/blockouts saved successfully.');
+      await loadData();
+      await loadDateSlots(selectedDate);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save calendar settings');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -189,7 +221,7 @@ export default function EmployeeCalendarPage() {
   const openSlotCount = useMemo(() => slots.filter((slot) => slot.status === 'open').length, [slots]);
   const takenSlotCount = useMemo(() => slots.filter((slot) => slot.status === 'booked').length, [slots]);
 
-  const addEntry = () => {
+  const addEntry = async () => {
     setError('');
     setMessage('');
 
@@ -216,38 +248,21 @@ export default function EmployeeCalendarPage() {
       repeat: newRepeat,
       until: newRepeat === 'none' ? undefined : (newUntil || undefined),
     }];
-    setEntries(next);
+    setSelectedDate(newDate);
+    const saved = await persistEntries(next);
+    if (saved) {
+      setNewUntil('');
+      setNewRepeat('none');
+    }
   };
 
-  const removeEntry = (index: number) => {
-    setEntries((prev) => prev.filter((_, i) => i !== index));
+  const removeEntry = async (index: number) => {
+    const nextEntries = entries.filter((_, i) => i !== index);
+    await persistEntries(nextEntries);
   };
 
   const saveEntries = async () => {
-    setSaving(true);
-    setError('');
-    setMessage('');
-
-    try {
-      const response = await fetch('/api/employee/availability', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entries }),
-      });
-
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(body?.error || 'Failed to save calendar settings');
-      }
-
-      setMessage('Calendar openings/blockouts saved successfully.');
-      await loadData();
-      await loadDateSlots(selectedDate);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save calendar settings');
-    } finally {
-      setSaving(false);
-    }
+    await persistEntries(entries);
   };
 
   const logout = async () => {
@@ -256,7 +271,28 @@ export default function EmployeeCalendarPage() {
   };
 
   if (loading) {
-    return <main className="min-h-screen bg-gray-50 p-8">Loading employee calendar...</main>;
+    return (
+      <main className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-3xl mx-auto bg-white border border-gray-200 rounded-lg p-6 shadow-sm space-y-4">
+          <p className="text-gray-900 font-semibold">Loading employee calendar...</p>
+          <p className="text-sm text-gray-600">If this hangs, use Bookings to continue working while calendar data loads.</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => router.push('/employee/dashboard')}
+              className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
+            >
+              Go to Bookings
+            </button>
+            <button
+              onClick={() => router.push('/account')}
+              className="px-4 py-2 bg-gray-200 text-gray-800 text-sm rounded-md hover:bg-gray-300"
+            >
+              Back to Account
+            </button>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -268,7 +304,12 @@ export default function EmployeeCalendarPage() {
             <span className="text-sm text-gray-500">Employee Calendar</span>
           </div>
           <div className="flex items-center gap-4 text-sm sm:text-base">
-            <Link href="/employee/dashboard" className="text-gray-700 hover:text-gray-900">Bookings</Link>
+            <button
+              onClick={() => router.push('/employee/dashboard')}
+              className="text-gray-700 hover:text-gray-900"
+            >
+              Bookings
+            </button>
             <Link href="/employee/calendar" className="text-gray-700 hover:text-gray-900 font-semibold">Calendar</Link>
             <button onClick={logout} className="text-gray-700 hover:text-gray-900">Logout</button>
           </div>
@@ -347,7 +388,7 @@ export default function EmployeeCalendarPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button onClick={addEntry} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">
+            <button onClick={() => void addEntry()} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">
               Add Entry
             </button>
             <button
@@ -452,7 +493,7 @@ export default function EmployeeCalendarPage() {
                     <p className="text-xs text-gray-500 mt-1">{recurrenceLabel(entry)}</p>
                   </div>
                   <button
-                    onClick={() => removeEntry(index)}
+                    onClick={() => void removeEntry(index)}
                     className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
                   >
                     Remove

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Logo from '@/app/components/Logo';
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 type User = {
   email: string;
@@ -203,6 +204,7 @@ function BookingCard({ booking, actionLoading, onUpdateSchedule }: BookingCardPr
 }
 
 export default function EmployeeDashboardPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -336,8 +338,18 @@ export default function EmployeeDashboardPage() {
             <span className="text-sm text-gray-500">Employee Dashboard</span>
           </div>
           <div className="flex items-center gap-4 text-sm sm:text-base">
-            <Link href="/employee/dashboard" className="text-gray-700 hover:text-gray-900">Bookings</Link>
-            <Link href="/employee/calendar" className="text-gray-700 hover:text-gray-900">Calendar</Link>
+            <button
+              onClick={() => router.push('/employee/dashboard')}
+              className="text-gray-700 hover:text-gray-900"
+            >
+              Bookings
+            </button>
+            <button
+              onClick={() => router.push('/employee/calendar')}
+              className="text-gray-700 hover:text-gray-900"
+            >
+              Calendar
+            </button>
             {user?.role === 'admin' && <Link href="/admin/users" className="text-gray-700 hover:text-gray-900">Manage Users</Link>}
             {user?.role === 'admin' && <Link href="/admin/booking" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>}
             <button onClick={logout} className="text-gray-700 hover:text-gray-900">Logout</button>

@@ -5,6 +5,7 @@ import type { BookingForm } from '@/lib/types';
 import { enforceMinimumCustomerPrice } from '@/lib/services/payoutService';
 import { getSessionFromRequest } from '@/lib/auth/session';
 import { isBookingSlotAvailable } from '@/lib/services/googleSheetsService';
+import { isServiceAreaValid } from '@/lib/services/pricingService';
 import { NextRequest, NextResponse } from 'next/server';
 
 function yesNoLabel(value: unknown) {
@@ -58,6 +59,12 @@ export async function POST(request: NextRequest) {
     if (!body.address || !body.city || !body.state || !body.zip_code) {
       return NextResponse.json({ error: 'Full service address is required' }, { status: 400 });
     }
+    if (!isServiceAreaValid(String(body.zip_code || ''))) {
+      return NextResponse.json(
+        { error: 'We currently only service the Boise area. Please check your ZIP code.' },
+        { status: 400 }
+      );
+    }
 
     const scheduledDate = String(body.scheduled_date || '').trim();
     const scheduledTime = String(body.scheduled_time || '').trim();
@@ -76,8 +83,14 @@ export async function POST(request: NextRequest) {
       service_details: buildServiceDetails(body as Record<string, unknown>),
     };
 
-    // Attempt to add to Google Sheets, but never block booking submission on sheet errors.
+    // Booking should only succeed if persistence succeeds.
     const sheetResult = await addBookingToSheet(bookingData);
+    if (!sheetResult.success) {
+      return NextResponse.json(
+        { error: sheetResult.error || 'Unable to save booking right now. Please try again.' },
+        { status: 503 }
+      );
+    }
 
     // Send confirmation email if customer provided email
     if (bookingData.customer_email) {
@@ -99,7 +112,6 @@ export async function POST(request: NextRequest) {
         success: true,
         booking_id: bookingData.booking_id,
         message: 'Booking submitted successfully',
-        sheet_warning: sheetResult.success ? undefined : sheetResult.error,
       },
       { status: 201 }
     );

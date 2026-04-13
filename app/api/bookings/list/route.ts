@@ -25,7 +25,11 @@ export async function GET(request: NextRequest) {
     }
 
     const bookings = await listBookingsFromSheet();
-    const mapped = bookings.map((booking) => {
+    const visibleBookings = session.role === 'admin'
+      ? bookings
+      : bookings.filter((booking) => String(booking.assigned_employee || '').trim().toLowerCase() === session.email.toLowerCase());
+
+    const mapped = visibleBookings.map((booking) => {
       const [fallbackCity = '', fallbackStateZip = ''] = booking.city_state_zip.split(',').map((v) => v.trim());
       const [fallbackState = '', fallbackZip = ''] = fallbackStateZip.split(' ');
       const city = booking.city || fallbackCity;

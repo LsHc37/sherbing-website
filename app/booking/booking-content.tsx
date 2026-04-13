@@ -283,7 +283,7 @@ export default function BookingContent() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        setErrors([errorData.message || 'Failed to get estimate']);
+        setErrors([errorData.error || 'Failed to get estimate']);
         return;
       }
 
@@ -340,7 +340,7 @@ export default function BookingContent() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        setErrors([errorData.message || 'Booking failed']);
+        setErrors([errorData.error || 'Booking failed']);
         return;
       }
 

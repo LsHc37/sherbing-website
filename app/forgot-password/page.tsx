@@ -53,7 +53,7 @@ export default function ForgotPasswordPage() {
           <div className="space-y-4">
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-green-900 text-sm">
-                <strong>Check your email!</strong> We've sent a password reset link to <strong>{email}</strong>. 
+                <strong>Check your email!</strong> We&apos;ve sent a password reset link to <strong>{email}</strong>. 
                 The link will expire in 1 hour.
               </p>
             </div>

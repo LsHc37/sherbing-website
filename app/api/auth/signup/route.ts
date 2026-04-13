@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createVerificationToken, getVerificationCookieName, getVerificationMaxAgeSeconds, hashPassword } from '@/lib/auth/session';
+import {
+  createVerificationToken,
+  getVerificationCookieName,
+  getVerificationMaxAgeSeconds,
+  hashPassword,
+  isAdminEmail,
+  validatePasswordStrength,
+} from '@/lib/auth/session';
 import { createUserInSheet } from '@/lib/services/googleSheetsService';
 import { generateVerificationCode, sendVerificationEmail } from '@/lib/services/bookingService';
+import { checkRateLimit, getRequestIp } from '@/lib/services/rateLimitService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,8 +24,23 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
-    const adminEmails = new Set(['lucas.mellen1@gmail.com', 'lucanmellen1@gmail.com']);
-    const role = adminEmails.has(normalizedEmail) ? 'admin' : 'customer';
+    const ip = getRequestIp(request);
+    const ipLimit = checkRateLimit(`signup:ip:${ip}`, 10, 15 * 60 * 1000);
+    const emailLimit = checkRateLimit(`signup:email:${normalizedEmail}`, 3, 60 * 60 * 1000);
+
+    if (!ipLimit.allowed || !emailLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many signup attempts. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
+    const passwordStrengthError = validatePasswordStrength(password);
+    if (passwordStrengthError) {
+      return NextResponse.json({ error: passwordStrengthError }, { status: 400 });
+    }
+
+    const role = isAdminEmail(normalizedEmail) ? 'admin' : 'customer';
 
     // Generate verification code for email
     const verificationCode = generateVerificationCode();
@@ -28,7 +51,7 @@ export async function POST(request: NextRequest) {
       email: normalizedEmail,
       full_name,
       phone,
-      password_hash: hashPassword(password),
+      password_hash: await hashPassword(password),
       role,
       email_verified: false,
       email_verification_code: verificationCode,
@@ -61,7 +84,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
 
-    response.cookies.set(getVerificationCookieName(), createVerificationToken({ email: normalizedEmail, code: verificationCode }), {
+    response.cookies.set(getVerificationCookieName(), createVerificationToken({ email: normalizedEmail }), {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',

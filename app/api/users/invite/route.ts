@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       email,
       full_name,
       phone,
-      password_hash: hashPassword(tempPassword),
+      password_hash: await hashPassword(tempPassword),
       role,
     });
 

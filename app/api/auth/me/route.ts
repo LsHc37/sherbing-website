@@ -4,6 +4,7 @@ import {
   getSessionCookieSettings,
   getSessionFromRequest,
   getSessionMaxAgeSeconds,
+  isAdminEmail,
 } from '@/lib/auth/session';
 import { findUserByEmail } from '@/lib/services/googleSheetsService';
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,8 +20,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
-  const adminEmails = new Set(['lucas.mellen1@gmail.com', 'lucanmellen1@gmail.com']);
-  const resolvedRole = adminEmails.has(user.email.toLowerCase()) ? 'admin' : user.role;
+  const resolvedRole = isAdminEmail(user.email) ? 'admin' : user.role;
 
   const refreshedToken = createSessionToken({
     email: user.email,

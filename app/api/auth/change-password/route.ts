@@ -1,4 +1,4 @@
-import { getSessionFromRequest, hashPassword } from '@/lib/auth/session';
+import { getSessionFromRequest, hashPassword, validatePasswordStrength, verifyPassword } from '@/lib/auth/session';
 import { findUserByEmail, updateUserInSheet } from '@/lib/services/googleSheetsService';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -17,8 +17,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Current and new password are required' }, { status: 400 });
     }
 
-    if (new_password.length < 8) {
-      return NextResponse.json({ error: 'New password must be at least 8 characters' }, { status: 400 });
+    const passwordStrengthError = validatePasswordStrength(new_password);
+    if (passwordStrengthError) {
+      return NextResponse.json({ error: passwordStrengthError }, { status: 400 });
     }
 
     const user = await findUserByEmail(session.email);
@@ -26,12 +27,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (user.password_hash !== hashPassword(current_password)) {
+    if (!(await verifyPassword(current_password, user.password_hash))) {
       return NextResponse.json({ error: 'Current password is incorrect' }, { status: 401 });
     }
 
     const result = await updateUserInSheet(session.email, {
-      password_hash: hashPassword(new_password),
+      password_hash: await hashPassword(new_password),
     });
 
     if (!result.success) {

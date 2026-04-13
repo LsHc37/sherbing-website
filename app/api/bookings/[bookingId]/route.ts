@@ -45,11 +45,27 @@ export async function PATCH(
     }
 
     if (session.role === 'employee' || session.role === 'admin') {
+      const booking = await findBookingById(bookingId);
+      if (!booking) {
+        return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+      }
+
       const status = body.status ? String(body.status) : undefined;
       const notes = body.notes ? String(body.notes) : undefined;
       const assignedEmployee = body.assigned_employee ? String(body.assigned_employee).trim().toLowerCase() : undefined;
       const scheduledDate = body.scheduled_date ? String(body.scheduled_date).trim() : undefined;
       const scheduledTime = body.scheduled_time ? String(body.scheduled_time).trim() : undefined;
+
+      if (session.role === 'employee') {
+        const currentAssignee = String(booking.assigned_employee || '').trim().toLowerCase();
+        const isAssignedToEmployee = currentAssignee === session.email.toLowerCase();
+        const isUnassigned = !currentAssignee;
+        const isClaimAttempt = assignedEmployee === session.email.toLowerCase() || status === 'confirmed';
+
+        if (!isAssignedToEmployee && !(isUnassigned && isClaimAttempt)) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+      }
 
       if (scheduledDate && scheduledTime) {
         const isAvailable = await isBookingSlotAvailable(scheduledDate, scheduledTime, bookingId);
@@ -63,7 +79,7 @@ export async function PATCH(
         ? assignedEmployee
         : shouldAutoAssignToEmployee
           ? session.email
-          : undefined;
+          : booking.assigned_employee || undefined;
 
       const result = await updateBookingInSheet(bookingId, {
         status,

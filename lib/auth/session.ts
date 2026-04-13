@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import type { NextRequest } from 'next/server';
 
 export type SessionUser = {
@@ -9,11 +10,25 @@ export type SessionUser = {
 
 const COOKIE_NAME = 'sherbing_session';
 const VERIFICATION_COOKIE_NAME = 'sherbing_verification';
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const SESSION_MAX_AGE_SECONDS = Number(process.env.SESSION_MAX_AGE_SECONDS || 60 * 60 * 8);
 const VERIFICATION_MAX_AGE_SECONDS = 60 * 10;
+const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS || 12);
+
+let cachedDevSecret: string | null = null;
 
 function getSecret() {
-  return process.env.AUTH_SECRET || 'dev-only-secret-change-me';
+  const configured = process.env.AUTH_SECRET?.trim();
+  if (configured) return configured;
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('AUTH_SECRET must be configured in production');
+  }
+
+  if (!cachedDevSecret) {
+    cachedDevSecret = crypto.randomBytes(32).toString('hex');
+  }
+
+  return cachedDevSecret;
 }
 
 function base64url(input: string) {
@@ -35,7 +50,49 @@ function sign(data: string) {
 }
 
 export function hashPassword(password: string) {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
+function hashLegacyPassword(password: string) {
   return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function isBcryptHash(value: string) {
+  return value.startsWith('$2a$') || value.startsWith('$2b$') || value.startsWith('$2y$');
+}
+
+export async function verifyPassword(password: string, storedHash: string) {
+  if (!storedHash) return false;
+  if (isBcryptHash(storedHash)) {
+    return bcrypt.compare(password, storedHash);
+  }
+
+  return hashLegacyPassword(password) === storedHash;
+}
+
+export function getAdminEmailSet() {
+  const configured = String(process.env.ADMIN_EMAILS || '');
+  return new Set(
+    configured
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+export function isAdminEmail(email: string) {
+  return getAdminEmailSet().has(String(email || '').trim().toLowerCase());
+}
+
+export function validatePasswordStrength(password: string) {
+  const value = String(password || '');
+
+  if (value.length < 12) return 'Password must be at least 12 characters';
+  if (!/[A-Z]/.test(value)) return 'Password must include at least one uppercase letter';
+  if (!/[a-z]/.test(value)) return 'Password must include at least one lowercase letter';
+  if (!/\d/.test(value)) return 'Password must include at least one number';
+
+  return null;
 }
 
 export function createSessionToken(user: SessionUser) {
@@ -102,7 +159,7 @@ export function getSessionCookieSettings() {
 
 export type VerificationToken = {
   email: string;
-  code: string;
+  code?: string;
 };
 
 export function createVerificationToken(payload: VerificationToken) {

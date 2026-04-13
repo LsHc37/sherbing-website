@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findUserByPasswordResetToken, updateUserInSheet } from '@/lib/services/googleSheetsService';
-import { hashPassword } from '@/lib/auth/session';
+import { hashPassword, validatePasswordStrength } from '@/lib/auth/session';
+import { checkRateLimit, getRequestIp } from '@/lib/services/rateLimitService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,11 +15,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: 'Password must be at least 8 characters' },
-        { status: 400 }
-      );
+    const ip = getRequestIp(request);
+    const ipLimit = checkRateLimit(`reset-password:ip:${ip}`, 10, 15 * 60 * 1000);
+    const tokenLimit = checkRateLimit(`reset-password:token:${String(token).slice(0, 16)}`, 8, 15 * 60 * 1000);
+    if (!ipLimit.allowed || !tokenLimit.allowed) {
+      return NextResponse.json({ error: 'Too many password reset attempts. Please try again later.' }, { status: 429 });
+    }
+
+    const passwordStrengthError = validatePasswordStrength(password);
+    if (passwordStrengthError) {
+      return NextResponse.json({ error: passwordStrengthError }, { status: 400 });
     }
 
     // Find user by reset token
@@ -31,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Hash new password and update user
-    const passwordHash = hashPassword(password);
+    const passwordHash = await hashPassword(password);
     const updated = await updateUserInSheet(user.email, {
       password_hash: passwordHash,
       password_reset_token: '', // Clear reset token

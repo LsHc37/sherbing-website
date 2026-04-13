@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateVerificationCode, sendVerificationEmail } from '@/lib/services/bookingService';
 import { createVerificationToken, getVerificationCookieName, getVerificationMaxAgeSeconds } from '@/lib/auth/session';
 import { findUserByEmail, updateUserInSheet } from '@/lib/services/googleSheetsService';
+import { checkRateLimit, getRequestIp } from '@/lib/services/rateLimitService';
 
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json();
     const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    const ip = getRequestIp(request);
+    const ipLimit = checkRateLimit(`send-verification:ip:${ip}`, 15, 15 * 60 * 1000);
+    const emailLimit = checkRateLimit(`send-verification:email:${normalizedEmail}`, 4, 15 * 60 * 1000);
+    if (!ipLimit.allowed || !emailLimit.allowed) {
+      return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
+    }
 
     if (!normalizedEmail || !normalizedEmail.includes('@')) {
       return NextResponse.json(
@@ -69,7 +77,7 @@ export async function POST(request: NextRequest) {
       message: 'Verification code sent to your email',
     });
 
-    response.cookies.set(getVerificationCookieName(), createVerificationToken({ email: normalizedEmail, code: verificationCode }), {
+    response.cookies.set(getVerificationCookieName(), createVerificationToken({ email: normalizedEmail }), {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',

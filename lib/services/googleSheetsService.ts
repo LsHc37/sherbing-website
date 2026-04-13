@@ -663,13 +663,14 @@ export async function getBookingAvailabilityForDate(date: string): Promise<Booki
 
   const bookings = await listBookingsFromSheet();
   const users = await listUsersFromSheet();
-  const bookedTimes = new Set(
-    bookings
-      .filter((booking) => normalizeDateString(booking.scheduled_date) === targetDate)
-      .filter((booking) => isBookingBlockingSlot(booking.status))
-      .map((booking) => normalizeTimeString(booking.scheduled_time))
-      .filter(Boolean)
-  );
+  const bookedCountsByTime = new Map<string, number>();
+  for (const booking of bookings) {
+    if (normalizeDateString(booking.scheduled_date) !== targetDate) continue;
+    if (!isBookingBlockingSlot(booking.status)) continue;
+    const normalizedTime = normalizeTimeString(booking.scheduled_time);
+    if (!normalizedTime) continue;
+    bookedCountsByTime.set(normalizedTime, (bookedCountsByTime.get(normalizedTime) || 0) + 1);
+  }
 
   const activeWorkers = users.filter((user) => {
     const role = String(user.role || '').toLowerCase();
@@ -677,18 +678,37 @@ export async function getBookingAvailabilityForDate(date: string): Promise<Booki
     return isActive && (role === 'employee' || role === 'admin');
   });
 
-  const allEntries = activeWorkers.flatMap((worker) => parseEmployeeAvailabilityEntries(worker.available_dates));
-  const openWindows = allEntries.filter((entry) => entry.type === 'open' && appliesOnDate(entry, targetDate));
-  const blockedWindows = allEntries.filter((entry) => entry.type === 'blocked' && appliesOnDate(entry, targetDate));
-  const hasOpenWindows = openWindows.length > 0;
+  const workerWindows = activeWorkers.map((worker) => {
+    const entries = parseEmployeeAvailabilityEntries(worker.available_dates);
+    return {
+      open: entries.filter((entry) => entry.type === 'open' && appliesOnDate(entry, targetDate)),
+      blocked: entries.filter((entry) => entry.type === 'blocked' && appliesOnDate(entry, targetDate)),
+    };
+  });
+
+  const availableWorkerCountAtTime = (time: string) => {
+    return workerWindows.reduce((count, windows) => {
+      const hasOpenWindows = windows.open.length > 0;
+      if (!hasOpenWindows) return count;
+
+      const withinOpenWindow = windows.open.some((entry) => isTimeWithinRange(time, entry.start, entry.end));
+      if (!withinOpenWindow) return count;
+
+      const blockedByCalendar = windows.blocked.some((entry) => isTimeWithinRange(time, entry.start, entry.end));
+      if (blockedByCalendar) return count;
+
+      return count + 1;
+    }, 0);
+  };
 
   return DEFAULT_BOOKING_TIME_SLOTS.map((time) => ({
     time,
     status: (() => {
-      const blockedByBooking = bookedTimes.has(time);
-      const blockedByCalendar = blockedWindows.some((entry) => isTimeWithinRange(time, entry.start, entry.end));
-      const withinOpenWindow = hasOpenWindows && openWindows.some((entry) => isTimeWithinRange(time, entry.start, entry.end));
-      return blockedByBooking || blockedByCalendar || !withinOpenWindow ? 'booked' : 'open';
+      const workerCapacity = availableWorkerCountAtTime(time);
+      if (workerCapacity <= 0) return 'booked';
+
+      const bookedCount = bookedCountsByTime.get(time) || 0;
+      return bookedCount >= workerCapacity ? 'booked' : 'open';
     })(),
   }));
 }
@@ -699,17 +719,47 @@ export async function isBookingSlotAvailable(date: string, time: string, exclude
   if (!targetDate || !targetTime) return true;
 
   const bookings = await listBookingsFromSheet();
+  const users = await listUsersFromSheet();
 
-  return !bookings.some((booking) => {
+  const activeWorkers = users.filter((user) => {
+    const role = String(user.role || '').toLowerCase();
+    const isActive = String(user.active || 'true').toLowerCase() !== 'false';
+    return isActive && (role === 'employee' || role === 'admin');
+  });
+
+  const workerCapacity = activeWorkers.reduce((count, worker) => {
+    const entries = parseEmployeeAvailabilityEntries(worker.available_dates);
+    const openWindows = entries.filter((entry) => entry.type === 'open' && appliesOnDate(entry, targetDate));
+    if (openWindows.length === 0) return count;
+
+    const withinOpen = openWindows.some((entry) => isTimeWithinRange(targetTime, entry.start, entry.end));
+    if (!withinOpen) return count;
+
+    const blockedWindows = entries.filter((entry) => entry.type === 'blocked' && appliesOnDate(entry, targetDate));
+    const blocked = blockedWindows.some((entry) => isTimeWithinRange(targetTime, entry.start, entry.end));
+    if (blocked) return count;
+
+    return count + 1;
+  }, 0);
+
+  if (workerCapacity <= 0) return false;
+
+  const bookedCount = bookings.reduce((count, booking) => {
     const sameBooking = excludeBookingId && booking.booking_id === excludeBookingId;
-    if (sameBooking) return false;
+    if (sameBooking) return count;
 
-    return (
+    if (
       normalizeDateString(booking.scheduled_date) === targetDate
       && normalizeTimeString(booking.scheduled_time) === targetTime
       && isBookingBlockingSlot(booking.status)
-    );
-  });
+    ) {
+      return count + 1;
+    }
+
+    return count;
+  }, 0);
+
+  return bookedCount < workerCapacity;
 }
 
 export async function clearAllBookingsInSheet() {

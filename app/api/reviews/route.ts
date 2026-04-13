@@ -1,19 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Review } from '@/lib/types';
+import { getSessionFromRequest } from '@/lib/auth/session';
+import { findBookingById } from '@/lib/services/googleSheetsService';
+import { checkRateLimit, getRequestIp } from '@/lib/services/rateLimitService';
 
 // In-memory storage for reviews (replace with database in production)
 const reviews: Review[] = [];
 
 export async function POST(request: NextRequest) {
   try {
+    const session = getSessionFromRequest(request);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const ip = getRequestIp(request);
+    const ipLimit = checkRateLimit(`reviews:ip:${ip}`, 20, 15 * 60 * 1000);
+    if (!ipLimit.allowed) {
+      return NextResponse.json({ error: 'Too many review submissions. Please try again later.' }, { status: 429 });
+    }
+
     const body = await request.json();
 
-    const { booking_id, customer_id, service_id, rating, title, comment } = body;
+    const { booking_id, service_id, rating, title, comment } = body;
 
     // Validate required fields
-    if (!booking_id || !customer_id || !service_id) {
+    if (!booking_id || !service_id) {
       return NextResponse.json(
-        { error: 'booking_id, customer_id, and service_id are required' },
+        { error: 'booking_id and service_id are required' },
         { status: 400 }
       );
     }
@@ -39,10 +53,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const booking = await findBookingById(String(booking_id));
+    if (!booking) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+
+    if (booking.customer_email.toLowerCase() !== session.email.toLowerCase()) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (String(booking.status || '').toLowerCase() !== 'completed') {
+      return NextResponse.json({ error: 'Reviews are only allowed for completed bookings' }, { status: 400 });
+    }
+
+    const existingReview = reviews.find((review) => review.booking_id === booking_id);
+    if (existingReview) {
+      return NextResponse.json({ error: 'A review for this booking already exists' }, { status: 409 });
+    }
+
     const review: Review = {
       id: `review-${Date.now()}-${Math.random().toString(36).substring(7)}`,
       booking_id,
-      customer_id,
+      customer_id: session.email,
       service_id,
       rating,
       title,

@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 let emailTransporter: nodemailer.Transporter | null = null;
 
@@ -56,7 +57,7 @@ async function sendMail(options: { to: string; subject: string; html: string; te
 }
 
 export function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 1000000).toString();
 }
 
 export async function sendVerificationEmail(

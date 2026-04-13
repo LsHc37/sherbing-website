@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 
 type User = {
@@ -31,7 +31,7 @@ export default function AdminUsersPage() {
     return Array.from(new Set(value.split(',').map((v) => v.trim()).filter(Boolean))).sort();
   };
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setMessage('');
 
@@ -65,7 +65,7 @@ export default function AdminUsersPage() {
     setAvailabilityDrafts(nextDrafts);
 
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -73,7 +73,7 @@ export default function AdminUsersPage() {
     }, 0);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [load]);
 
   const updateUser = async (email: string, payload: { role?: User['role']; active?: string; available_dates?: string }) => {
     const response = await fetch(`/api/users/${encodeURIComponent(email)}`, {
