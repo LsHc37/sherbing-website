@@ -62,12 +62,18 @@ function isBcryptHash(value: string) {
 }
 
 export async function verifyPassword(password: string, storedHash: string) {
-  if (!storedHash) return false;
-  if (isBcryptHash(storedHash)) {
-    return bcrypt.compare(password, storedHash);
-  }
+  const normalizedHash = String(storedHash || '').trim();
+  if (!normalizedHash) return false;
 
-  return hashLegacyPassword(password) === storedHash;
+  try {
+    if (isBcryptHash(normalizedHash)) {
+      return bcrypt.compare(password, normalizedHash);
+    }
+
+    return hashLegacyPassword(password) === normalizedHash;
+  } catch {
+    return false;
+  }
 }
 
 export function getAdminEmailSet() {

@@ -401,18 +401,18 @@ function parseUserRows(rows: string[][]): UserSheetRow[] {
 
   return rows.slice(1).map((row) => ({
     created_at: get(row, 'Created At'),
-    email: get(row, 'Email').toLowerCase(),
-    full_name: get(row, 'Full Name'),
-    phone: get(row, 'Phone'),
-    password_hash: get(row, 'Password Hash'),
-    role: ((get(row, 'Role') || 'customer') as UserSheetRow['role']),
-    active: get(row, 'Active') || 'true',
+    email: get(row, 'Email').trim().toLowerCase(),
+    full_name: get(row, 'Full Name').trim(),
+    phone: get(row, 'Phone').trim(),
+    password_hash: get(row, 'Password Hash').trim(),
+    role: ((get(row, 'Role').trim() || 'customer') as UserSheetRow['role']),
+    active: get(row, 'Active').trim() || 'true',
     email_verified: isTruthy(get(row, 'Email Verified')) ? 'true' : 'false',
-    email_verification_code: get(row, 'Email Verification Code'),
-    email_verification_expires: get(row, 'Email Verification Expires'),
-    password_reset_token: get(row, 'Password Reset Token'),
-    password_reset_expires: get(row, 'Password Reset Expires'),
-    available_dates: get(row, 'Available Dates'),
+    email_verification_code: get(row, 'Email Verification Code').trim(),
+    email_verification_expires: get(row, 'Email Verification Expires').trim(),
+    password_reset_token: get(row, 'Password Reset Token').trim(),
+    password_reset_expires: get(row, 'Password Reset Expires').trim(),
+    available_dates: get(row, 'Available Dates').trim(),
   }));
 }
 
