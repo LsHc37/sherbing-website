@@ -11,8 +11,6 @@ export type ServiceType =
 
 export type WindowCleaningScope = 'exterior' | 'interior_exterior';
 
-export type GutterCleaningPricingMode = 'linear_foot' | 'flat_rate';
-
 export type LawnMowingFrequency = 'weekly' | 'bi_weekly';
 
 export interface Service {
@@ -53,11 +51,7 @@ export interface Booking {
   lawn_bag_clippings?: boolean;
   lawn_heavy_pet_waste?: boolean;
   lawn_access_blocked?: boolean;
-  gutter_length_ft?: number;
   gutter_story_count?: number;
-  gutter_downspout_count?: number;
-  gutter_has_guards?: boolean;
-  gutter_pricing_mode?: GutterCleaningPricingMode;
   address: string;
   city: string;
   state: string;
@@ -87,11 +81,7 @@ export interface BookingForm {
   lawn_bag_clippings?: 'yes' | 'no';
   lawn_heavy_pet_waste?: 'yes' | 'no';
   lawn_access_blocked?: 'yes' | 'no';
-  gutter_length_ft?: string;
   gutter_story_count?: '1' | '2';
-  gutter_downspout_count?: string;
-  gutter_has_guards?: 'yes' | 'no';
-  gutter_pricing_mode?: GutterCleaningPricingMode;
   address: string;
   city: string;
   state: string;

@@ -24,11 +24,7 @@ export default function BookingContent() {
     window_count: '',
     window_scope: 'exterior' as 'exterior' | 'interior_exterior',
     window_screen_track_count: '',
-    gutter_length_ft: '',
     gutter_story_count: '1' as '1' | '2',
-    gutter_downspout_count: '',
-    gutter_has_guards: 'no' as 'yes' | 'no',
-    gutter_pricing_mode: 'linear_foot' as 'linear_foot' | 'flat_rate',
     address: '',
     city: '',
     state: 'ID',
@@ -134,11 +130,7 @@ export default function BookingContent() {
           window_count: formData.window_count ? Number(formData.window_count) : undefined,
           window_scope: formData.service_ids.includes('window_cleaning') ? formData.window_scope : undefined,
           window_screen_track_count: formData.window_screen_track_count ? Number(formData.window_screen_track_count) : undefined,
-          gutter_length_ft: formData.gutter_length_ft ? Number(formData.gutter_length_ft) : undefined,
           gutter_story_count: formData.service_ids.includes('gutter_cleaning') ? Number(formData.gutter_story_count) : undefined,
-          gutter_downspout_count: formData.gutter_downspout_count ? Number(formData.gutter_downspout_count) : undefined,
-          gutter_has_guards: formData.service_ids.includes('gutter_cleaning') ? formData.gutter_has_guards === 'yes' : undefined,
-          gutter_pricing_mode: formData.service_ids.includes('gutter_cleaning') ? formData.gutter_pricing_mode : undefined,
         }),
       });
 
@@ -373,28 +365,10 @@ export default function BookingContent() {
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900">Gutter Cleaning Details</h3>
                   <p className="text-sm text-slate-600 mt-1">
-                    Choose linear-foot or flat-rate pricing, then add story count, downspouts, and gutter guards if needed.
+                    Gutter cleaning is priced from home size and story count only.
                   </p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <select
-                    name="gutter_pricing_mode"
-                    value={formData.gutter_pricing_mode}
-                    onChange={handleInputChange}
-                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  >
-                    <option value="linear_foot">Linear foot</option>
-                    <option value="flat_rate">Flat rate by home size</option>
-                  </select>
-                  <input
-                    type="number"
-                    min="1"
-                    name="gutter_length_ft"
-                    placeholder="Gutter length (ft)"
-                    value={formData.gutter_length_ft}
-                    onChange={handleInputChange}
-                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <select
                     name="gutter_story_count"
                     value={formData.gutter_story_count}
@@ -403,24 +377,6 @@ export default function BookingContent() {
                   >
                     <option value="1">Single-story</option>
                     <option value="2">Two-story</option>
-                  </select>
-                  <input
-                    type="number"
-                    min="0"
-                    name="gutter_downspout_count"
-                    placeholder="Downspouts"
-                    value={formData.gutter_downspout_count}
-                    onChange={handleInputChange}
-                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
-                  <select
-                    name="gutter_has_guards"
-                    value={formData.gutter_has_guards}
-                    onChange={handleInputChange}
-                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent sm:col-span-2 lg:col-span-4"
-                  >
-                    <option value="no">No gutter guards</option>
-                    <option value="yes">Yes, gutter guards installed</option>
                   </select>
                 </div>
               </div>

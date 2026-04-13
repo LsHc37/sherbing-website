@@ -1,6 +1,5 @@
 import type {
   BookingForm,
-  GutterCleaningPricingMode,
   Service,
   ServiceType,
   WindowCleaningScope,
@@ -22,11 +21,7 @@ type LawnMowingPricingInput = {
 };
 
 type GutterCleaningPricingInput = {
-  lengthFt?: number;
   storyCount?: number;
-  downspoutCount?: number;
-  hasGuards?: boolean;
-  pricingMode?: GutterCleaningPricingMode;
 };
 
 type EstimateContext = {
@@ -87,7 +82,7 @@ export const SERVICE_PRICING: Record<string, PricingRule> = {
     name: 'Gutter Cleaning', 
     pricePerSqft: 0, 
     minimumPrice: 90, 
-    description: 'Professional gutter cleaning priced by linear footage or by home size and stories, with add-ons for downspouts and gutter guards.',
+    description: 'Professional gutter cleaning priced by home size and number of stories.',
     images: ['/services/gutter-cleaning-1.jpg']
   },
   hedge_trimming: { 
@@ -188,49 +183,25 @@ function estimateLawnMowingPrice(
   return roundToNearestFive(basePrice);
 }
 
-function getEstimatedGutterLength(propertySqft: number): number {
-  if (propertySqft <= 0) {
-    return 150;
-  }
-
-  return Math.min(300, Math.max(100, Math.round(propertySqft / 12)));
-}
-
 function estimateGutterCleaningPrice(
   propertySqft: number,
   yardSqft: number,
   input: GutterCleaningPricingInput = {}
 ): number {
   const storyCount = Math.max(1, Math.round(input.storyCount || 1));
-  const downspoutCount = Math.max(0, Math.round(input.downspoutCount || 0));
-  const hasGuards = Boolean(input.hasGuards);
-  const pricingMode = input.pricingMode || (input.lengthFt ? 'linear_foot' : 'flat_rate');
-  const gutterLengthFt = Math.max(0, Math.round(input.lengthFt || getEstimatedGutterLength(propertySqft || yardSqft)));
+  const homeSize = Math.max(propertySqft, yardSqft, 0);
 
   let baseCharge = 0;
 
-  if (pricingMode === 'linear_foot') {
-    const perFootRate = storyCount >= 2 ? 2.0 : 1.25;
-    baseCharge = gutterLengthFt * perFootRate;
+  if (homeSize < 1500) {
+    baseCharge = storyCount >= 2 ? 150 : 105;
+  } else if (homeSize < 2500) {
+    baseCharge = storyCount >= 2 ? 210 : 140;
   } else {
-    const footprint = Math.max(propertySqft, 0);
-    if (footprint < 1500) {
-      baseCharge = storyCount >= 2 ? 150 : 105;
-    } else if (footprint < 2500) {
-      baseCharge = storyCount >= 2 ? 210 : 140;
-    } else {
-      baseCharge = storyCount >= 2 ? 275 : 180;
-    }
+    baseCharge = storyCount >= 2 ? 275 : 180;
   }
 
-  const downspoutCharge = downspoutCount * 15;
-  let total = baseCharge + downspoutCharge;
-
-  if (hasGuards) {
-    total *= 2;
-  }
-
-  return Math.max(total, 90);
+  return Math.max(baseCharge, 90);
 }
 
 export function calculateEstimatePrice(serviceId: string, propertySqft: number, yardSqft: number, context?: EstimateContext): number {

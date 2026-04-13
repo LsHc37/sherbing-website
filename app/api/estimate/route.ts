@@ -13,11 +13,7 @@ type EstimatePayload = {
   window_count?: number;
   window_scope?: 'exterior' | 'interior_exterior';
   window_screen_track_count?: number;
-  gutter_length_ft?: number;
   gutter_story_count?: number;
-  gutter_downspout_count?: number;
-  gutter_has_guards?: boolean;
-  gutter_pricing_mode?: 'linear_foot' | 'flat_rate';
   address: string;
   city: string;
   state: string;
@@ -44,11 +40,7 @@ function fallbackEstimate(payload: EstimatePayload): number {
       screenTrackCount: payload.window_screen_track_count,
     },
     gutterCleaning: {
-      lengthFt: payload.gutter_length_ft,
       storyCount: payload.gutter_story_count,
-      downspoutCount: payload.gutter_downspout_count,
-      hasGuards: payload.gutter_has_guards,
-      pricingMode: payload.gutter_pricing_mode,
     },
   });
 }
@@ -66,11 +58,7 @@ export async function POST(request: NextRequest) {
     const window_count = Number(body.window_count || 0) || undefined;
     const window_scope = body.window_scope || undefined;
     const window_screen_track_count = Number(body.window_screen_track_count || 0) || undefined;
-    const gutter_length_ft = Number(body.gutter_length_ft || 0) || undefined;
     const gutter_story_count = Number(body.gutter_story_count || 0) || undefined;
-    const gutter_downspout_count = Number(body.gutter_downspout_count || 0) || undefined;
-    const gutter_has_guards = typeof body.gutter_has_guards === 'boolean' ? body.gutter_has_guards : undefined;
-    const gutter_pricing_mode = body.gutter_pricing_mode || undefined;
     const address = body.address || '';
     const city = body.city || '';
     const state = body.state || '';
@@ -94,11 +82,7 @@ export async function POST(request: NextRequest) {
       window_count,
       window_scope,
       window_screen_track_count,
-      gutter_length_ft,
       gutter_story_count,
-      gutter_downspout_count,
-      gutter_has_guards,
-      gutter_pricing_mode,
       address,
       city,
       state,
@@ -148,7 +132,7 @@ export async function POST(request: NextRequest) {
       `Selected package: ${JSON.stringify(selectedPackage)}`,
       'Lawn mowing pricing uses the following tiers: Small/Patio under 4000 sqft = $35 weekly or $45 bi-weekly; Standard Subdivision 4000-7000 sqft = $45 weekly or $55 bi-weekly; Large/Corner Lot 7000-10000 sqft = $55 weekly or $70 bi-weekly; Estate/Oversized 10000-13000 sqft = $65 weekly or $85 bi-weekly; Acreage/Custom 13000+ sqft = $65 weekly plus $10 per extra 3000 sqft, and bi-weekly should be custom-priced higher because of overgrowth risk. Add 1.5x for initial overgrowth cuts, +$10 for bagging clippings, +$15 for heavy pet waste, and treat blocked access or locked gates as full-charge jobs.',
       'Window cleaning pricing uses a $30 trip charge, $5 per exterior window, $8 per interior-and-exterior window, and $2 per screen/track add-on.',
-      'Gutter cleaning pricing uses either $1.25 per linear foot for single-story homes or $2.00 per linear foot for two-story homes, or a flat size-based estimate: small under 1500 sqft = $90-$120 single-story or $130-$170 two-story, medium 1500-2500 sqft = $120-$160 single-story or $170-$250 two-story, large 2500+ sqft = $160-$250+ single-story or $250-$350+ two-story. Add $15 per downspout and double the standard rate for gutter guards.',
+      'Gutter cleaning pricing uses home size and story count only: small under 1500 sqft = $105 single-story or $150 two-story, medium 1500-2500 sqft = $140 single-story or $210 two-story, large 2500+ sqft = $180 single-story or $275 two-story.',
       `Customer notes: ${notes || 'none'}`,
       `Known property sqft from user (if any): ${property_sqft || 'unknown'}`,
       `Known yard sqft from user (if any): ${yard_sqft || 'unknown'}`,
@@ -227,11 +211,7 @@ export async function POST(request: NextRequest) {
           screenTrackCount: window_screen_track_count,
         },
         gutterCleaning: {
-          lengthFt: gutter_length_ft,
           storyCount: gutter_story_count,
-          downspoutCount: gutter_downspout_count,
-          hasGuards: gutter_has_guards,
-          pricingMode: gutter_pricing_mode,
         },
       })
     );
