@@ -7,6 +7,39 @@ import { getSessionFromRequest } from '@/lib/auth/session';
 import { isBookingSlotAvailable } from '@/lib/services/googleSheetsService';
 import { NextRequest, NextResponse } from 'next/server';
 
+function yesNoLabel(value: unknown) {
+  return String(value) === 'yes' ? 'Yes' : 'No';
+}
+
+function buildServiceDetails(body: Record<string, unknown>) {
+  const serviceIds = Array.isArray(body.service_ids) ? body.service_ids.map((v) => String(v)) : [];
+  const details: string[] = [];
+
+  if (serviceIds.includes('lawn_mowing')) {
+    details.push(`Lawn Frequency: ${String(body.lawn_mowing_frequency || 'weekly')}`);
+    details.push(`Initial Overgrowth: ${yesNoLabel(body.lawn_initial_overgrowth)}`);
+    details.push(`Bag Clippings: ${yesNoLabel(body.lawn_bag_clippings)}`);
+    details.push(`Heavy Pet Waste: ${yesNoLabel(body.lawn_heavy_pet_waste)}`);
+    details.push(`Access Blocked: ${yesNoLabel(body.lawn_access_blocked)}`);
+  }
+
+  if (serviceIds.includes('window_cleaning')) {
+    details.push(`Window Count: ${String(body.window_count || 'N/A')}`);
+    details.push(`Window Scope: ${String(body.window_scope || 'exterior')}`);
+    details.push(`Screen/Track Count: ${String(body.window_screen_track_count || '0')}`);
+  }
+
+  if (serviceIds.includes('gutter_cleaning')) {
+    details.push(`Gutter Story Count: ${String(body.gutter_story_count || '1')}`);
+  }
+
+  if (body.package_id) {
+    details.push(`Package: ${String(body.package_id)}`);
+  }
+
+  return details.join(' | ');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -40,6 +73,7 @@ export async function POST(request: NextRequest) {
       customer_email: customerEmail,
       booking_id: `SHERBING-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`,
       estimated_price: enforceMinimumCustomerPrice(Number(body.estimated_price || 0)),
+      service_details: buildServiceDetails(body as Record<string, unknown>),
     };
 
     // Attempt to add to Google Sheets, but never block booking submission on sheet errors.

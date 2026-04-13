@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
         customer_email: booking.customer_email,
         customer_phone: booking.customer_phone,
         service_id: booking.service,
+        service_details: booking.service_details || '',
         property_sqft: booking.property_sqft || '',
         yard_sqft: booking.yard_sqft || '',
         package_id: booking.package || '',

@@ -24,6 +24,7 @@ type BookingSheetRow = {
   sherbing_fee: string;
   employee_payout: string;
   package: string;
+  service_details?: string;
   notes: string;
   status: string;
   assigned_employee: string;
@@ -212,6 +213,7 @@ export async function initializeSheet() {
     'Sherbing Fee',
     'Employee Payout',
     'Package',
+    'Service Details',
     'Notes',
     'Status',
     'Assigned Employee',
@@ -264,6 +266,7 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
   };
 
   const getAt = (row: string[], index: number) => String(row[index] || '').trim();
+  const hasServiceDetailsColumn = aliasIndices(['Service Details', 'service_details']).length > 0;
   const hasLetters = (value: string) => /[a-zA-Z]/.test(value);
   const hasDigits = (value: string) => /\d/.test(value);
   const isLikelyEmail = (value: string) => /.+@.+\..+/.test(value);
@@ -304,6 +307,7 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       sherbing_fee: getByAliases(row, ['Sherbing Fee', 'sherbing_fee']),
       employee_payout: getByAliases(row, ['Employee Payout', 'employee_payout']),
       package: getByAliases(row, ['Package', 'package_id']),
+      service_details: getByAliases(row, ['Service Details', 'service_details']),
       notes: getByAliases(row, ['Notes', 'notes']),
       status: getByAliases(row, ['Status', 'status']) || 'pending',
       assigned_employee: getByAliases(row, ['Assigned Employee', 'assigned_employee']),
@@ -331,10 +335,11 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       sherbing_fee: getAt(row, 17),
       employee_payout: getAt(row, 18),
       package: getAt(row, 19),
-      notes: getAt(row, 20),
-      status: getAt(row, 21) || 'pending',
-      assigned_employee: getAt(row, 22),
-      customer_update_request: getAt(row, 23),
+      service_details: hasServiceDetailsColumn ? getAt(row, 20) : '',
+      notes: hasServiceDetailsColumn ? getAt(row, 21) : getAt(row, 20),
+      status: (hasServiceDetailsColumn ? getAt(row, 22) : getAt(row, 21)) || 'pending',
+      assigned_employee: hasServiceDetailsColumn ? getAt(row, 23) : getAt(row, 22),
+      customer_update_request: hasServiceDetailsColumn ? getAt(row, 24) : getAt(row, 23),
     };
 
     const usePositional = scoreCandidate(positionalBase) > scoreCandidate(headerBasedBase);
@@ -373,6 +378,7 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       sherbing_fee: base.sherbing_fee || String(payout.sherbingFee),
       employee_payout: base.employee_payout || String(payout.employeePayout),
       package: base.package,
+      service_details: base.service_details,
       notes: base.notes,
       status: base.status || 'pending',
       assigned_employee: base.assigned_employee,
@@ -453,6 +459,7 @@ export async function addBookingToSheet(booking: BookingForm & { booking_id: str
       String(pricing.sherbingFee),
       String(pricing.employeePayout),
       booking.package_id || '',
+      booking.service_details || '',
       booking.notes || '',
       'pending',
       '',

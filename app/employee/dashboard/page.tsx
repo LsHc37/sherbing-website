@@ -16,6 +16,7 @@ type Booking = {
   customer_email: string;
   customer_phone: string;
   service_id: string;
+  service_details?: string;
   property_sqft?: string;
   yard_sqft?: string;
   package_id?: string;
@@ -81,6 +82,7 @@ function includesSearchTerm(booking: Booking, term: string): boolean {
     booking.customer_email,
     booking.customer_phone,
     booking.service_id,
+    booking.service_details,
     booking.address,
     booking.city,
     booking.state,
@@ -123,6 +125,15 @@ function BookingCard({ booking, actionLoading, onUpdateSchedule }: BookingCardPr
           </p>
 
           <p className="text-gray-700">{formatAddress(booking) || 'Address unavailable'}</p>
+
+          {booking.service_details && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 mb-1">Work Details</p>
+              <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">
+                {booking.service_details.split('|').map((item) => item.trim()).filter(Boolean).join('\n')}
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 text-sm text-gray-600">
             <p><span className="font-medium text-gray-800">Customer:</span> {booking.customer_name || 'N/A'}</p>

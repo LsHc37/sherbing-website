@@ -73,6 +73,7 @@ export interface BookingForm {
   service_id?: string;
   service_ids?: string[];
   package_id?: string;
+  service_details?: string;
   window_count?: string;
   window_scope?: WindowCleaningScope;
   window_screen_track_count?: string;
