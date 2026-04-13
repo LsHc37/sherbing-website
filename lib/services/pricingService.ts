@@ -1,5 +1,39 @@
-import type { BookingForm, Service, ServiceType } from '@/lib/types';
+import type {
+  BookingForm,
+  GutterCleaningPricingMode,
+  Service,
+  ServiceType,
+  WindowCleaningScope,
+} from '@/lib/types';
 import { enforceMinimumCustomerPrice } from '@/lib/services/payoutService';
+
+type WindowCleaningPricingInput = {
+  windowCount?: number;
+  scope?: WindowCleaningScope;
+  screenTrackCount?: number;
+};
+
+type LawnMowingPricingInput = {
+  frequency?: 'weekly' | 'bi_weekly';
+  initialOvergrowth?: boolean;
+  bagClippings?: boolean;
+  heavyPetWaste?: boolean;
+  accessBlocked?: boolean;
+};
+
+type GutterCleaningPricingInput = {
+  lengthFt?: number;
+  storyCount?: number;
+  downspoutCount?: number;
+  hasGuards?: boolean;
+  pricingMode?: GutterCleaningPricingMode;
+};
+
+type EstimateContext = {
+  lawnMowing?: LawnMowingPricingInput;
+  windowCleaning?: WindowCleaningPricingInput;
+  gutterCleaning?: GutterCleaningPricingInput;
+};
 
 type PricingRule = {
   name: string;
@@ -28,10 +62,9 @@ export const BOISE_SERVICE_AREA_ZIP_CODES = [
 export const SERVICE_PRICING: Record<string, PricingRule> = {
   lawn_mowing: { 
     name: 'Lawn Mowing', 
-    pricePerSqft: 0.006, 
-    minimumPrice: 35, 
-    maximumPrice: 40,
-    description: 'Professional lawn cutting with edge trimming and cleanup. Weekly or bi-weekly service available.',
+    pricePerSqft: 0,
+    minimumPrice: 35,
+    description: 'Professional lawn cutting priced by mowable grass size, service frequency, and add-ons for overgrowth or special conditions.',
     images: ['/services/lawn-mowing-1.jpg', '/services/lawn-mowing-2.jpg']
   },
   lawn_treatment: { 
@@ -53,9 +86,8 @@ export const SERVICE_PRICING: Record<string, PricingRule> = {
   gutter_cleaning: { 
     name: 'Gutter Cleaning', 
     pricePerSqft: 0, 
-    minimumPrice: 100, 
-    maximumPrice: 100,
-    description: 'Professional gutter cleaning to prevent water damage and keep drainage flowing.',
+    minimumPrice: 90, 
+    description: 'Professional gutter cleaning priced by linear footage or by home size and stories, with add-ons for downspouts and gutter guards.',
     images: ['/services/gutter-cleaning-1.jpg']
   },
   hedge_trimming: { 
@@ -68,19 +100,17 @@ export const SERVICE_PRICING: Record<string, PricingRule> = {
   },
   window_cleaning: { 
     name: 'Window Cleaning', 
-    pricePerSqft: 0.03, 
+    pricePerSqft: 0,
     minimumPrice: 30, 
-    maximumPrice: 120, 
-    areaBasis: 'property',
-    description: 'Crystal-clear window cleaning inside and out for sparkling results.',
+    description: 'Crystal-clear window cleaning with a trip charge plus per-window pricing for exterior or interior and exterior cleans.',
     images: ['/services/window-cleaning-1.jpg']
   },
   dog_waste_removal: { 
     name: 'Dog Waste Pickup', 
-    pricePerSqft: 0.002, 
-    minimumPrice: 10, 
-    maximumPrice: 15,
-    description: 'Weekly dog waste removal service to keep your yard clean and healthy.',
+    pricePerSqft: 0, 
+    minimumPrice: 20, 
+    maximumPrice: 20,
+    description: 'Flat-rate dog waste pickup service to keep your yard clean and healthy.',
     images: ['/services/dog-waste-1.jpg']
   },
 };
@@ -91,9 +121,140 @@ export const SERVICE_PACKAGES: PackageRule[] = [
   { id: 'premium_property_bundle', name: 'Premium Property Bundle (Multi-Service)', discountPercent: 12 },
 ];
 
-export function calculateEstimatePrice(serviceId: string, propertySqft: number, yardSqft: number): number {
+function getEstimatedWindowCount(propertySqft: number, yardSqft: number): number {
+  const footprint = Math.max(propertySqft, yardSqft, 0);
+  if (!footprint) {
+    return 12;
+  }
+
+  return Math.min(30, Math.max(8, Math.round(footprint / 150)));
+}
+
+function getEstimatedMowableGrass(propertySqft: number, yardSqft: number): number {
+  const footprint = Math.max(yardSqft, propertySqft, 0);
+  if (!footprint) {
+    return 5000;
+  }
+
+  return footprint;
+}
+
+function roundToNearestFive(value: number): number {
+  return Math.round(value / 5) * 5;
+}
+
+function estimateLawnMowingPrice(
+  propertySqft: number,
+  yardSqft: number,
+  input: LawnMowingPricingInput = {}
+): number {
+  const mowableGrass = getEstimatedMowableGrass(propertySqft, yardSqft);
+  const frequency = input.frequency || 'weekly';
+  const isBiWeekly = frequency === 'bi_weekly';
+
+  let basePrice: number;
+
+  if (mowableGrass < 4000) {
+    basePrice = isBiWeekly ? 45 : 35;
+  } else if (mowableGrass < 7000) {
+    basePrice = isBiWeekly ? 55 : 45;
+  } else if (mowableGrass < 10000) {
+    basePrice = isBiWeekly ? 70 : 55;
+  } else if (mowableGrass < 13000) {
+    basePrice = isBiWeekly ? 85 : 65;
+  } else {
+    const extraSqft = Math.max(0, mowableGrass - 13000);
+    const extraBlocks = Math.ceil(extraSqft / 3000);
+    const weeklyBase = 65 + (extraBlocks * 10);
+    basePrice = isBiWeekly ? roundToNearestFive(weeklyBase * 1.3) : weeklyBase;
+  }
+
+  if (input.initialOvergrowth) {
+    basePrice *= 1.5;
+  }
+
+  if (input.bagClippings) {
+    basePrice += 10;
+  }
+
+  if (input.heavyPetWaste) {
+    basePrice += 15;
+  }
+
+  if (input.accessBlocked) {
+    basePrice = Math.max(basePrice, 35);
+  }
+
+  return roundToNearestFive(basePrice);
+}
+
+function getEstimatedGutterLength(propertySqft: number): number {
+  if (propertySqft <= 0) {
+    return 150;
+  }
+
+  return Math.min(300, Math.max(100, Math.round(propertySqft / 12)));
+}
+
+function estimateGutterCleaningPrice(
+  propertySqft: number,
+  yardSqft: number,
+  input: GutterCleaningPricingInput = {}
+): number {
+  const storyCount = Math.max(1, Math.round(input.storyCount || 1));
+  const downspoutCount = Math.max(0, Math.round(input.downspoutCount || 0));
+  const hasGuards = Boolean(input.hasGuards);
+  const pricingMode = input.pricingMode || (input.lengthFt ? 'linear_foot' : 'flat_rate');
+  const gutterLengthFt = Math.max(0, Math.round(input.lengthFt || getEstimatedGutterLength(propertySqft || yardSqft)));
+
+  let baseCharge = 0;
+
+  if (pricingMode === 'linear_foot') {
+    const perFootRate = storyCount >= 2 ? 2.0 : 1.25;
+    baseCharge = gutterLengthFt * perFootRate;
+  } else {
+    const footprint = Math.max(propertySqft, 0);
+    if (footprint < 1500) {
+      baseCharge = storyCount >= 2 ? 150 : 105;
+    } else if (footprint < 2500) {
+      baseCharge = storyCount >= 2 ? 210 : 140;
+    } else {
+      baseCharge = storyCount >= 2 ? 275 : 180;
+    }
+  }
+
+  const downspoutCharge = downspoutCount * 15;
+  let total = baseCharge + downspoutCharge;
+
+  if (hasGuards) {
+    total *= 2;
+  }
+
+  return Math.max(total, 90);
+}
+
+export function calculateEstimatePrice(serviceId: string, propertySqft: number, yardSqft: number, context?: EstimateContext): number {
   const pricing = SERVICE_PRICING[serviceId];
   if (!pricing) return 0;
+
+  if (serviceId === 'window_cleaning') {
+    const windowCleaning = context?.windowCleaning || {};
+    const windowCount = Math.max(0, Math.round(windowCleaning.windowCount || getEstimatedWindowCount(propertySqft, yardSqft)));
+    const screenTrackCount = Math.max(0, Math.round(windowCleaning.screenTrackCount || 0));
+    const scope = windowCleaning.scope || 'exterior';
+    const baseTripCharge = 30;
+    const perWindowCharge = scope === 'interior_exterior' ? 8 : 5;
+
+    return baseTripCharge + (windowCount * perWindowCharge) + (screenTrackCount * 2);
+  }
+
+  if (serviceId === 'lawn_mowing') {
+    return estimateLawnMowingPrice(propertySqft, yardSqft, context?.lawnMowing);
+  }
+
+  if (serviceId === 'gutter_cleaning') {
+    return estimateGutterCleaningPrice(propertySqft, yardSqft, context?.gutterCleaning);
+  }
 
   const areaToUse = pricing.areaBasis === 'property'
     ? propertySqft
@@ -113,12 +274,13 @@ export function calculateMultiServiceEstimate(
   serviceIds: string[],
   propertySqft: number,
   yardSqft: number,
-  packageId?: string
+  packageId?: string,
+  context?: EstimateContext
 ): number {
   if (!serviceIds.length) return 0;
 
   const subtotal = serviceIds.reduce((sum, serviceId) => {
-    return sum + calculateEstimatePrice(serviceId, propertySqft, yardSqft);
+    return sum + calculateEstimatePrice(serviceId, propertySqft, yardSqft, context);
   }, 0);
 
   if (!packageId) return enforceMinimumCustomerPrice(subtotal);

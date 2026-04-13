@@ -6,19 +6,21 @@ export const SERVICE_DETAILS: Record<string, {
   faqs: Array<{ question: string; answer: string }>;
 }> = {
   lawn_mowing: {
-    fullDescription: `Professional lawn mowing is the foundation of a well-maintained yard. Our team uses commercial-grade equipment and proven techniques to deliver a clean, manicured cut every time. Whether you need a one-time mow or a recurring weekly or bi-weekly service, we tailor the schedule to your grass type and season.
+    fullDescription: `Professional lawn mowing is the foundation of a well-maintained yard. Our pricing is based on mowable grass size and service frequency so quotes stay simple and fair.
 
-Our lawn mowing service includes edge trimming along sidewalks and driveways, ensuring your property looks polished from every angle. We dispose of all clippings and debris, leaving your yard neat and ready to enjoy.`,
+Weekly service starts at $35 for small yards and scales up through standard, large, and estate properties. Bi-weekly service carries a higher rate because the grass is taller and the job takes longer. We also price overgrowth, bagging, pet waste, and blocked access separately so you know exactly what you are paying for.`,
     benefits: [
       'Professional equipment ensuring a clean, even cut',
       'Edge trimming and driveway/sidewalk cleanup included',
-      'Flexible scheduling - weekly, bi-weekly, or one-time service',
-      'Recurring discounts for regular maintenance',
+      'Weekly and bi-weekly pricing tiers',
+      'Add-ons for overgrowth, bagging, and heavy pet waste',
+      'Clear policy for blocked access or locked gates',
       'Keeps lawn healthy and prevents overgrowth',
       'Improves curb appeal and property value',
     ],
     process: [
-      'Schedule your preferred frequency (weekly, bi-weekly, or one-time)',
+      'Choose weekly or bi-weekly mowing',
+      'Select any add-ons needed for the job',
       'We arrive with commercial equipment ready to work',
       'Mow, edge, and trim your entire lawn',
       'Clean up all debris and dispose properly',
@@ -26,8 +28,8 @@ Our lawn mowing service includes edge trimming along sidewalks and driveways, en
     ],
     faqs: [
       {
-        question: 'How often should I get my lawn mowed?',
-        answer: 'During growing season (spring/summer), weekly or bi-weekly is ideal. In fall/winter, frequency can be reduced. We help determine the best schedule for your grass type and climate.',
+        question: 'How is lawn mowing priced?',
+        answer: 'We price based on mowable grass size and frequency. Weekly rates are lower than bi-weekly rates, and acreage gets a custom estimate.',
       },
       {
         question: 'Do you provide equipment or do I need my own?',
@@ -35,11 +37,15 @@ Our lawn mowing service includes edge trimming along sidewalks and driveways, en
       },
       {
         question: 'What if my grass is very overgrown?',
-        answer: 'We can handle overgrown lawns, though initial mowing may take longer and cost more. Subsequent regular mowings are more efficient.',
+        answer: 'Initial overgrowth cuts are charged at 1.5x the base mowing rate.',
       },
       {
         question: 'Do you mulch clippings or bag them?',
-        answer: 'We mulch clippings by default, which returns nutrients to your soil. Bagging is available upon request for an additional fee.',
+        answer: 'We mulch clippings by default. Bagging clippings is available for an additional $10 per visit.',
+      },
+      {
+        question: 'What about pet waste or blocked access?',
+        answer: 'Heavy pet waste adds $15 per visit. If the yard cannot be fully accessed because of a locked gate or blocked entry, the full charge still applies.',
       },
     ],
   },
@@ -162,20 +168,24 @@ Quick response times mean your property is cleared before you need it. We handle
     ],
   },
   gutter_cleaning: {
-    fullDescription: `Clogged gutters lead to water damage, foundation issues, and costly repairs. Our professional gutter cleaning service removes debris, leaves, and buildup to keep water flowing properly.
+    fullDescription: `Clogged gutters lead to water damage, foundation issues, and costly repairs. Our gutter cleaning service uses a pricing model built for real jobs: you can estimate by linear foot or use a fast flat-rate model based on home size and story count.
 
-Twice-yearly cleaning—spring and fall—protects your home from water damage and extends your gutter's lifespan. We handle the dirty work so you don't have to.`,
+Single-story homes are priced lower than two-story homes because of the extra ladder work and time. If your gutters have guards, expect a premium because the job takes significantly longer. We also charge extra for difficult downspout clogs that require extra labor.
+`,
     benefits: [
       'Prevents water damage to your home',
       'Protects foundation from water intrusion',
       'Extends gutter lifespan significantly',
+      'Single-story and two-story pricing options',
+      'Additional charges for downspout clogs and gutter guards',
       'Prevents ice dams in winter',
       'Safe professional service using proper equipment',
       'Maintains home value protection',
       'Reduces costly repairs from water damage',
     ],
     process: [
-      'Schedule cleaning at convenient time',
+      'Choose linear-foot or flat-rate pricing',
+      'Confirm story count, downspouts, and gutter guards',
       'Our team safely accesses all gutters',
       'Remove debris, leaves, and buildup',
       'Flush system to ensure proper drainage',
@@ -184,20 +194,20 @@ Twice-yearly cleaning—spring and fall—protects your home from water damage a
     ],
     faqs: [
       {
+        question: 'How is gutter cleaning priced?',
+        answer: 'We price by linear foot or by flat-rate size tiers. Single-story homes are cheaper, two-story homes cost more because of ladder work, and gutter guards increase the price because they take extra time.',
+      },
+      {
+        question: 'What adds to the cost?',
+        answer: 'Clogged downspouts, gutter guards, and steep or difficult roof access can increase the final price.',
+      },
+      {
+        question: 'What if my house is large?',
+        answer: 'Larger homes usually fall into the higher flat-rate tier, or they will cost more by linear foot because there is simply more gutter to clean.',
+      },
+      {
         question: 'How often should gutters be cleaned?',
-        answer: 'We recommend twice yearly—spring after winter debris and fall after leaves fall. More often if you have many trees.',
-      },
-      {
-        question: 'Is it safe to clean gutters myself?',
-        answer: 'It\'s risky without proper equipment and training. We have safety gear and experience to do it efficiently.',
-      },
-      {
-        question: 'Do you install gutter guards?',
-        answer: 'We can recommend and install quality gutter guards to reduce cleaning frequency.',
-      },
-      {
-        question: 'What if I have water damage already?',
-        answer: 'Regular cleaning prevents further damage. We can assess and recommend repairs if needed.',
+        answer: 'Twice yearly is the standard recommendation, and more often if your property has many trees or heavy debris buildup.',
       },
     ],
   },
@@ -241,41 +251,42 @@ From formal hedges to natural-looking shrub formations, we tailor our trimming t
     ],
   },
   window_cleaning: {
-    fullDescription: `Sparkling clean windows brighten your home and improve your view of the world. Our professional window cleaning service removes dirt, grime, and buildup from both inside and outside.
+    fullDescription: `Sparkling clean windows brighten your home and improve your view of the world. Our window cleaning service uses a simple hybrid pricing model that keeps quotes competitive and fair: a base trip charge, a per-window rate, and an optional screens-and-tracks add-on.
 
-Using professional techniques and equipment, we clean windows efficiently and safely, even on multi-story homes. Your windows will shine and let in maximum natural light.`,
+Exterior-only jobs are the best value for fast ground-floor cleans. Interior and exterior work takes more time because of the setup, care around the home, and the extra detail involved. We use professional techniques and equipment so your windows shine and let in maximum natural light.`,
     benefits: [
       'Streak-free, sparkling clean windows',
       'Improves natural light throughout home',
       'Safe cleaning of hard-to-reach windows',
       'Professional equipment for thorough results',
-      'Interior and exterior cleaning included',
+      'Flexible exterior-only or interior-and-exterior options',
+      'Optional screens-and-tracks add-on for a fuller clean',
       'Enhances curb appeal',
       'One-time or recurring service available',
     ],
     process: [
-      'Schedule your cleaning appointment',
-      'We arrive with professional equipment',
-      'Systematically clean all interior and exterior windows',
-      'Address frames and sills for complete cleanliness',
+      'Share your window count and cleaning scope',
+      'We confirm the trip charge and per-window pricing',
+      'Clean exterior only or both interior and exterior surfaces',
+      'Add screens and tracks if requested',
       'Streak-free shine guaranteed',
     ],
     faqs: [
       {
-        question: 'How often should windows be cleaned?',
-        answer: 'Monthly or quarterly is ideal for interior. Exterior depends on weather—2-4 times yearly is typical.',
+        question: 'How is window cleaning priced?',
+        answer: 'We use a base trip charge plus a per-window rate. Exterior-only jobs are priced lower than interior-and-exterior cleans, and screens/tracks are optional add-ons.',
       },
       {
-        question: 'Is professional cleaning expensive?',
-        answer: 'Investment in professional cleaning is small compared to the improved lighting and appeal it provides.',
+        question: 'Why charge more for interior work?',
+        answer: 'Interior work takes more time and care because of entry, protection around furniture, and cleanup, so it is priced higher than exterior-only service.',
       },
       {
-        question: 'Do you clean skylights and difficult windows?',
-        answer: 'Yes! We have equipment and experience for skylights, high windows, and tricky locations.',
+        question: 'Do you offer screens and tracks cleaning?',
+        answer: 'Yes. Screens and tracks can be added for an additional per-window charge when you want a fuller clean.',
       },
       {
-        question: 'What if it rains after cleaning?',
-        answer: 'Rain won\'t spot professionally cleaned windows. We use techniques that prevent streaking and spotting.',
+        question: 'Can you handle second-story windows?',
+        answer: 'Yes, as long as access is safe. If a job needs ladders or special access, we evaluate it before confirming the quote.',
       },
     ],
   },
@@ -554,10 +565,11 @@ Rock installation is durable, low-maintenance landscaping that adds visual inter
     ],
   },
   dog_waste_removal: {
-    fullDescription: `Keep your yard clean and safe with weekly dog waste removal service. We discretely remove waste from your yard, eliminating odor and health hazards.
+    fullDescription: `Keep your yard clean and safe with flat-rate dog waste pickup. We discretely remove waste from your yard, eliminating odor and health hazards.
 
-Regular removal prevents buildup, keeps your yard hygienic for family and guests, and eliminates the unpleasant task from your to-do list. Perfect for busy pet owners.`,
+  At $20 per visit, this service stays simple and easy to book. Regular removal prevents buildup, keeps your yard hygienic for family and guests, and eliminates the unpleasant task from your to-do list. Perfect for busy pet owners.`,
     benefits: [
+      'Flat $20 price per visit',
       'Eliminates yard odor completely',
       'Prevents parasites and contamination',
       'Keeps yard safe for children',
@@ -575,7 +587,7 @@ Regular removal prevents buildup, keeps your yard hygienic for family and guests
     faqs: [
       {
         question: 'How often should waste be removed?',
-        answer: 'Weekly is ideal for most households. More frequent service available for larger pets or multiple dogs.',
+        answer: 'Weekly is ideal for most households, and every visit is a flat $20 no matter the yard size.',
       },
       {
         question: 'Where do you dispose of the waste?',
@@ -583,7 +595,7 @@ Regular removal prevents buildup, keeps your yard hygienic for family and guests
       },
       {
         question: 'What if I have multiple dogs?',
-        answer: 'No problem! We adjust pricing based on number of dogs and yard size.',
+        answer: 'No problem! The service stays flat at $20 per visit, though very large or heavily used yards may need more frequent visits.',
       },
       {
         question: 'Do you service in winter?',

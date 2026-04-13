@@ -16,6 +16,19 @@ export default function BookingContent() {
   const [formData, setFormData] = useState({
     service_ids: [] as string[],
     package_id: '',
+    lawn_mowing_frequency: 'weekly' as 'weekly' | 'bi_weekly',
+    lawn_initial_overgrowth: 'no' as 'yes' | 'no',
+    lawn_bag_clippings: 'no' as 'yes' | 'no',
+    lawn_heavy_pet_waste: 'no' as 'yes' | 'no',
+    lawn_access_blocked: 'no' as 'yes' | 'no',
+    window_count: '',
+    window_scope: 'exterior' as 'exterior' | 'interior_exterior',
+    window_screen_track_count: '',
+    gutter_length_ft: '',
+    gutter_story_count: '1' as '1' | '2',
+    gutter_downspout_count: '',
+    gutter_has_guards: 'no' as 'yes' | 'no',
+    gutter_pricing_mode: 'linear_foot' as 'linear_foot' | 'flat_rate',
     address: '',
     city: '',
     state: 'ID',
@@ -113,6 +126,19 @@ export default function BookingContent() {
           state: formData.state,
           zip_code: formData.zip_code,
           service_ids: formData.service_ids,
+          lawn_mowing_frequency: formData.service_ids.includes('lawn_mowing') ? formData.lawn_mowing_frequency : undefined,
+          lawn_initial_overgrowth: formData.service_ids.includes('lawn_mowing') ? formData.lawn_initial_overgrowth === 'yes' : undefined,
+          lawn_bag_clippings: formData.service_ids.includes('lawn_mowing') ? formData.lawn_bag_clippings === 'yes' : undefined,
+          lawn_heavy_pet_waste: formData.service_ids.includes('lawn_mowing') ? formData.lawn_heavy_pet_waste === 'yes' : undefined,
+          lawn_access_blocked: formData.service_ids.includes('lawn_mowing') ? formData.lawn_access_blocked === 'yes' : undefined,
+          window_count: formData.window_count ? Number(formData.window_count) : undefined,
+          window_scope: formData.service_ids.includes('window_cleaning') ? formData.window_scope : undefined,
+          window_screen_track_count: formData.window_screen_track_count ? Number(formData.window_screen_track_count) : undefined,
+          gutter_length_ft: formData.gutter_length_ft ? Number(formData.gutter_length_ft) : undefined,
+          gutter_story_count: formData.service_ids.includes('gutter_cleaning') ? Number(formData.gutter_story_count) : undefined,
+          gutter_downspout_count: formData.gutter_downspout_count ? Number(formData.gutter_downspout_count) : undefined,
+          gutter_has_guards: formData.service_ids.includes('gutter_cleaning') ? formData.gutter_has_guards === 'yes' : undefined,
+          gutter_pricing_mode: formData.service_ids.includes('gutter_cleaning') ? formData.gutter_pricing_mode : undefined,
         }),
       });
 
@@ -192,6 +218,9 @@ export default function BookingContent() {
   };
 
   const selectedServices = services.filter((s) => formData.service_ids.includes(s.id));
+  const includesLawnMowing = selectedServices.some((service) => service.id === 'lawn_mowing');
+  const includesWindowCleaning = selectedServices.some((service) => service.id === 'window_cleaning');
+  const includesGutterCleaning = selectedServices.some((service) => service.id === 'gutter_cleaning');
 
   return (
     <main className="page-shell min-h-screen py-12 px-4 sm:px-6 lg:px-8">
@@ -240,6 +269,162 @@ export default function BookingContent() {
                 </label>
               ))}
             </div>
+
+            {includesLawnMowing && (
+              <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Lawn Mowing Details</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Choose the mowing frequency and any add-ons that apply to the visit.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <select
+                    name="lawn_mowing_frequency"
+                    value={formData.lawn_mowing_frequency}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="weekly">Weekly</option>
+                    <option value="bi_weekly">Bi-weekly</option>
+                  </select>
+                  <select
+                    name="lawn_initial_overgrowth"
+                    value={formData.lawn_initial_overgrowth}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="no">No overgrowth cut</option>
+                    <option value="yes">Initial overgrowth cut</option>
+                  </select>
+                  <select
+                    name="lawn_bag_clippings"
+                    value={formData.lawn_bag_clippings}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="no">Mulch clippings</option>
+                    <option value="yes">Bag clippings (+$10)</option>
+                  </select>
+                  <select
+                    name="lawn_heavy_pet_waste"
+                    value={formData.lawn_heavy_pet_waste}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="no">No heavy pet waste</option>
+                    <option value="yes">Heavy pet waste (+$15)</option>
+                  </select>
+                  <select
+                    name="lawn_access_blocked"
+                    value={formData.lawn_access_blocked}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="no">Full access available</option>
+                    <option value="yes">Locked gate / blocked yard</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {includesWindowCleaning && (
+              <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Window Cleaning Details</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Add the window count and cleaning scope so the estimate uses the base trip fee plus per-window pricing.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <input
+                    type="number"
+                    min="1"
+                    name="window_count"
+                    placeholder="Number of windows"
+                    value={formData.window_count}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  />
+                  <select
+                    name="window_scope"
+                    value={formData.window_scope}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="exterior">Exterior only</option>
+                    <option value="interior_exterior">Interior and exterior</option>
+                  </select>
+                  <input
+                    type="number"
+                    min="0"
+                    name="window_screen_track_count"
+                    placeholder="Screens/tracks count"
+                    value={formData.window_screen_track_count}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            )}
+
+            {includesGutterCleaning && (
+              <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Gutter Cleaning Details</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Choose linear-foot or flat-rate pricing, then add story count, downspouts, and gutter guards if needed.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <select
+                    name="gutter_pricing_mode"
+                    value={formData.gutter_pricing_mode}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="linear_foot">Linear foot</option>
+                    <option value="flat_rate">Flat rate by home size</option>
+                  </select>
+                  <input
+                    type="number"
+                    min="1"
+                    name="gutter_length_ft"
+                    placeholder="Gutter length (ft)"
+                    value={formData.gutter_length_ft}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  />
+                  <select
+                    name="gutter_story_count"
+                    value={formData.gutter_story_count}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="1">Single-story</option>
+                    <option value="2">Two-story</option>
+                  </select>
+                  <input
+                    type="number"
+                    min="0"
+                    name="gutter_downspout_count"
+                    placeholder="Downspouts"
+                    value={formData.gutter_downspout_count}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  />
+                  <select
+                    name="gutter_has_guards"
+                    value={formData.gutter_has_guards}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent sm:col-span-2 lg:col-span-4"
+                  >
+                    <option value="no">No gutter guards</option>
+                    <option value="yes">Yes, gutter guards installed</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Address Information */}

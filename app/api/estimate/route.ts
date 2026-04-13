@@ -5,6 +5,19 @@ import { NextRequest, NextResponse } from 'next/server';
 type EstimatePayload = {
   service_ids: string[];
   package_id?: string;
+  lawn_mowing_frequency?: 'weekly' | 'bi_weekly';
+  lawn_initial_overgrowth?: boolean;
+  lawn_bag_clippings?: boolean;
+  lawn_heavy_pet_waste?: boolean;
+  lawn_access_blocked?: boolean;
+  window_count?: number;
+  window_scope?: 'exterior' | 'interior_exterior';
+  window_screen_track_count?: number;
+  gutter_length_ft?: number;
+  gutter_story_count?: number;
+  gutter_downspout_count?: number;
+  gutter_has_guards?: boolean;
+  gutter_pricing_mode?: 'linear_foot' | 'flat_rate';
   address: string;
   city: string;
   state: string;
@@ -17,7 +30,27 @@ type EstimatePayload = {
 function fallbackEstimate(payload: EstimatePayload): number {
   const propertySqft = Number(payload.property_sqft || 1840);
   const yardSqft = Number(payload.yard_sqft || 5500);
-  return calculateMultiServiceEstimate(payload.service_ids, propertySqft, yardSqft, payload.package_id);
+  return calculateMultiServiceEstimate(payload.service_ids, propertySqft, yardSqft, payload.package_id, {
+    lawnMowing: {
+      frequency: payload.lawn_mowing_frequency,
+      initialOvergrowth: payload.lawn_initial_overgrowth,
+      bagClippings: payload.lawn_bag_clippings,
+      heavyPetWaste: payload.lawn_heavy_pet_waste,
+      accessBlocked: payload.lawn_access_blocked,
+    },
+    windowCleaning: {
+      windowCount: payload.window_count,
+      scope: payload.window_scope,
+      screenTrackCount: payload.window_screen_track_count,
+    },
+    gutterCleaning: {
+      lengthFt: payload.gutter_length_ft,
+      storyCount: payload.gutter_story_count,
+      downspoutCount: payload.gutter_downspout_count,
+      hasGuards: payload.gutter_has_guards,
+      pricingMode: payload.gutter_pricing_mode,
+    },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -25,6 +58,19 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as Partial<EstimatePayload>;
     const service_ids = Array.isArray(body.service_ids) ? body.service_ids : [];
     const package_id = body.package_id || undefined;
+    const lawn_mowing_frequency = body.lawn_mowing_frequency || undefined;
+    const lawn_initial_overgrowth = typeof body.lawn_initial_overgrowth === 'boolean' ? body.lawn_initial_overgrowth : undefined;
+    const lawn_bag_clippings = typeof body.lawn_bag_clippings === 'boolean' ? body.lawn_bag_clippings : undefined;
+    const lawn_heavy_pet_waste = typeof body.lawn_heavy_pet_waste === 'boolean' ? body.lawn_heavy_pet_waste : undefined;
+    const lawn_access_blocked = typeof body.lawn_access_blocked === 'boolean' ? body.lawn_access_blocked : undefined;
+    const window_count = Number(body.window_count || 0) || undefined;
+    const window_scope = body.window_scope || undefined;
+    const window_screen_track_count = Number(body.window_screen_track_count || 0) || undefined;
+    const gutter_length_ft = Number(body.gutter_length_ft || 0) || undefined;
+    const gutter_story_count = Number(body.gutter_story_count || 0) || undefined;
+    const gutter_downspout_count = Number(body.gutter_downspout_count || 0) || undefined;
+    const gutter_has_guards = typeof body.gutter_has_guards === 'boolean' ? body.gutter_has_guards : undefined;
+    const gutter_pricing_mode = body.gutter_pricing_mode || undefined;
     const address = body.address || '';
     const city = body.city || '';
     const state = body.state || '';
@@ -40,6 +86,19 @@ export async function POST(request: NextRequest) {
     const payload: EstimatePayload = {
       service_ids,
       package_id,
+      lawn_mowing_frequency,
+      lawn_initial_overgrowth,
+      lawn_bag_clippings,
+      lawn_heavy_pet_waste,
+      lawn_access_blocked,
+      window_count,
+      window_scope,
+      window_screen_track_count,
+      gutter_length_ft,
+      gutter_story_count,
+      gutter_downspout_count,
+      gutter_has_guards,
+      gutter_pricing_mode,
       address,
       city,
       state,
@@ -87,6 +146,9 @@ export async function POST(request: NextRequest) {
       `Address: ${addressText}`,
       `Selected services: ${JSON.stringify(selectedServices)}`,
       `Selected package: ${JSON.stringify(selectedPackage)}`,
+      'Lawn mowing pricing uses the following tiers: Small/Patio under 4000 sqft = $35 weekly or $45 bi-weekly; Standard Subdivision 4000-7000 sqft = $45 weekly or $55 bi-weekly; Large/Corner Lot 7000-10000 sqft = $55 weekly or $70 bi-weekly; Estate/Oversized 10000-13000 sqft = $65 weekly or $85 bi-weekly; Acreage/Custom 13000+ sqft = $65 weekly plus $10 per extra 3000 sqft, and bi-weekly should be custom-priced higher because of overgrowth risk. Add 1.5x for initial overgrowth cuts, +$10 for bagging clippings, +$15 for heavy pet waste, and treat blocked access or locked gates as full-charge jobs.',
+      'Window cleaning pricing uses a $30 trip charge, $5 per exterior window, $8 per interior-and-exterior window, and $2 per screen/track add-on.',
+      'Gutter cleaning pricing uses either $1.25 per linear foot for single-story homes or $2.00 per linear foot for two-story homes, or a flat size-based estimate: small under 1500 sqft = $90-$120 single-story or $130-$170 two-story, medium 1500-2500 sqft = $120-$160 single-story or $170-$250 two-story, large 2500+ sqft = $160-$250+ single-story or $250-$350+ two-story. Add $15 per downspout and double the standard rate for gutter guards.',
       `Customer notes: ${notes || 'none'}`,
       `Known property sqft from user (if any): ${property_sqft || 'unknown'}`,
       `Known yard sqft from user (if any): ${yard_sqft || 'unknown'}`,
@@ -151,7 +213,27 @@ export async function POST(request: NextRequest) {
 
     const safeEstimated = Math.max(
       estimated_price,
-      calculateMultiServiceEstimate(service_ids, inferred_property_sqft, inferred_yard_sqft, package_id)
+      calculateMultiServiceEstimate(service_ids, inferred_property_sqft, inferred_yard_sqft, package_id, {
+        lawnMowing: {
+          frequency: lawn_mowing_frequency,
+          initialOvergrowth: lawn_initial_overgrowth,
+          bagClippings: lawn_bag_clippings,
+          heavyPetWaste: lawn_heavy_pet_waste,
+          accessBlocked: lawn_access_blocked,
+        },
+        windowCleaning: {
+          windowCount: window_count,
+          scope: window_scope,
+          screenTrackCount: window_screen_track_count,
+        },
+        gutterCleaning: {
+          lengthFt: gutter_length_ft,
+          storyCount: gutter_story_count,
+          downspoutCount: gutter_downspout_count,
+          hasGuards: gutter_has_guards,
+          pricingMode: gutter_pricing_mode,
+        },
+      })
     );
 
     return NextResponse.json(

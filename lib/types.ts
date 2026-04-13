@@ -9,6 +9,12 @@ export type ServiceType =
   | 'window_cleaning'
   | 'dog_waste_removal';
 
+export type WindowCleaningScope = 'exterior' | 'interior_exterior';
+
+export type GutterCleaningPricingMode = 'linear_foot' | 'flat_rate';
+
+export type LawnMowingFrequency = 'weekly' | 'bi_weekly';
+
 export interface Service {
   id: string;
   name: string;
@@ -39,6 +45,19 @@ export interface Booking {
   service_id?: string;
   service_ids?: string[];
   package_id?: string;
+  window_count?: number;
+  window_scope?: WindowCleaningScope;
+  window_screen_track_count?: number;
+  lawn_mowing_frequency?: LawnMowingFrequency;
+  lawn_initial_overgrowth?: boolean;
+  lawn_bag_clippings?: boolean;
+  lawn_heavy_pet_waste?: boolean;
+  lawn_access_blocked?: boolean;
+  gutter_length_ft?: number;
+  gutter_story_count?: number;
+  gutter_downspout_count?: number;
+  gutter_has_guards?: boolean;
+  gutter_pricing_mode?: GutterCleaningPricingMode;
   address: string;
   city: string;
   state: string;
@@ -60,6 +79,19 @@ export interface BookingForm {
   service_id?: string;
   service_ids?: string[];
   package_id?: string;
+  window_count?: string;
+  window_scope?: WindowCleaningScope;
+  window_screen_track_count?: string;
+  lawn_mowing_frequency?: LawnMowingFrequency;
+  lawn_initial_overgrowth?: 'yes' | 'no';
+  lawn_bag_clippings?: 'yes' | 'no';
+  lawn_heavy_pet_waste?: 'yes' | 'no';
+  lawn_access_blocked?: 'yes' | 'no';
+  gutter_length_ft?: string;
+  gutter_story_count?: '1' | '2';
+  gutter_downspout_count?: string;
+  gutter_has_guards?: 'yes' | 'no';
+  gutter_pricing_mode?: GutterCleaningPricingMode;
   address: string;
   city: string;
   state: string;
