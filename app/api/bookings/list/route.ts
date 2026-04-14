@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
       const customerPrice = parseCurrencyValue(booking.customer_price);
       const sherbingFee = parseCurrencyValue(booking.sherbing_fee);
       const employeePayout = parseCurrencyValue(booking.employee_payout);
+      const scheduledDurationMinutes = Number(booking.scheduled_duration_minutes || 60);
       const payout = calculatePayoutBreakdown(estimatedPrice);
       return {
         id: booking.booking_id,
@@ -56,6 +57,9 @@ export async function GET(request: NextRequest) {
         zip_code: zip,
         scheduled_date: booking.scheduled_date || '',
         scheduled_time: booking.scheduled_time || '',
+        scheduled_duration_minutes: Number.isFinite(scheduledDurationMinutes) && scheduledDurationMinutes > 0
+          ? scheduledDurationMinutes
+          : 60,
         estimated_price: payout.customerPrice,
         customer_price: customerPrice || payout.customerPrice,
         sherbing_fee: sherbingFee || payout.sherbingFee,

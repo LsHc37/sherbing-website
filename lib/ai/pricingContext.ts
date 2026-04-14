@@ -6,7 +6,7 @@ export const AI_PRICING_CONTEXT = {
     { id: 'lawn_mowing', label: 'Lawn Mowing', targetRange: [35, 85] },
     { id: 'lawn_treatment', label: 'Lawn Treatment', targetRange: [45, 75] },
     { id: 'dog_waste_removal', label: 'Dog Waste Pickup', targetRange: [20, 20] },
-    { id: 'gutter_cleaning', label: 'Gutter Cleaning', targetRange: [90, 350] },
+    { id: 'gutter_cleaning', label: 'Gutter Cleaning', targetRange: [75, 300] },
     { id: 'hedge_trimming', label: 'Hedge Trimming', targetRange: [20, 45] },
     { id: 'window_cleaning', label: 'Window Cleaning', targetRange: [30, 250] },
     { id: 'snow_removal', label: 'Snow Removal', targetRange: [60, 140] },

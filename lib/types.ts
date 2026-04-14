@@ -62,6 +62,7 @@ export interface Booking {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   scheduled_date?: string;
   scheduled_time?: string; // HH:MM format like "09:00" or "14:30"
+  scheduled_duration_minutes?: number;
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -94,6 +95,7 @@ export interface BookingForm {
   customer_phone?: string;
   scheduled_date?: string;
   scheduled_time?: string;
+  scheduled_duration_minutes?: number;
   notes?: string;
 }
 
@@ -112,6 +114,7 @@ export interface Review {
 export interface BookingUpdate {
   scheduled_date?: string;
   scheduled_time?: string;
+  scheduled_duration_minutes?: number;
   notes?: string;
   status?: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   cancellation_reason?: string;

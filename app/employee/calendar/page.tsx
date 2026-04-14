@@ -31,14 +31,35 @@ type Booking = {
   customer_email: string;
   customer_phone: string;
   service_id: string;
+  service_details?: string;
+  property_sqft?: string;
+  yard_sqft?: string;
+  package_id?: string;
   address: string;
   city: string;
   state: string;
   zip_code: string;
   scheduled_date?: string;
   scheduled_time?: string;
+  scheduled_duration_minutes?: number;
   status: string;
   assigned_employee: string;
+};
+
+type BookingDetailUpdates = {
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  service_id: string;
+  service_details: string;
+  scheduled_duration_minutes: number;
+  property_sqft: string;
+  yard_sqft: string;
+  package_id: string;
+  address: string;
+  city: string;
+  state: string;
+  zip_code: string;
 };
 
 function getDefaultDate() {
@@ -78,6 +99,171 @@ function recurrenceLabel(entry: AvailabilityEntry): string {
   if (repeat === 'weekly') return `Weekly${entry.until ? ` until ${entry.until}` : ''}`;
   if (repeat === 'weekdays') return `Weekdays${entry.until ? ` until ${entry.until}` : ''}`;
   return 'One-time';
+}
+
+type BookingSlotCardProps = {
+  booking: Booking;
+  actionLoading: string | null;
+  onDeleteBooking: (bookingId: string) => Promise<void>;
+  onSaveBookingDetails: (bookingId: string, updates: BookingDetailUpdates) => Promise<void>;
+};
+
+function BookingSlotCard({ booking, actionLoading, onDeleteBooking, onSaveBookingDetails }: BookingSlotCardProps) {
+  const [customerNameDraft, setCustomerNameDraft] = useState(booking.customer_name || '');
+  const [customerEmailDraft, setCustomerEmailDraft] = useState(booking.customer_email || '');
+  const [customerPhoneDraft, setCustomerPhoneDraft] = useState(booking.customer_phone || '');
+  const [serviceIdDraft, setServiceIdDraft] = useState(booking.service_id || '');
+  const [serviceDetailsDraft, setServiceDetailsDraft] = useState(booking.service_details || '');
+  const [scheduledDurationDraft, setScheduledDurationDraft] = useState(Number(booking.scheduled_duration_minutes || 60));
+  const [propertySqftDraft, setPropertySqftDraft] = useState(booking.property_sqft || '');
+  const [yardSqftDraft, setYardSqftDraft] = useState(booking.yard_sqft || '');
+  const [packageIdDraft, setPackageIdDraft] = useState(booking.package_id || '');
+  const [addressDraft, setAddressDraft] = useState(booking.address || '');
+  const [cityDraft, setCityDraft] = useState(booking.city || '');
+  const [stateDraft, setStateDraft] = useState(booking.state || '');
+  const [zipCodeDraft, setZipCodeDraft] = useState(booking.zip_code || '');
+
+  return (
+    <div className="rounded border border-gray-200 bg-white p-3 space-y-2">
+      <p className="text-sm font-semibold text-gray-900">{booking.customer_name || 'Customer'}</p>
+      <p className="text-xs text-gray-600">{prettyService(booking.service_id)}</p>
+      <p className="text-xs text-gray-600">Status: {prettyStatus(booking.status)}</p>
+      <p className="text-xs text-gray-600">Duration: {Number(booking.scheduled_duration_minutes || 60)} minutes</p>
+      <p className="text-xs text-gray-600">Phone: {booking.customer_phone || 'N/A'}</p>
+      <p className="text-xs text-gray-600">Email: {booking.customer_email || 'N/A'}</p>
+      <p className="text-xs text-gray-600">Address: {formatAddress(booking) || 'N/A'}</p>
+
+      <div className="rounded border border-slate-200 bg-slate-50 p-2 space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">Edit Booking</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input
+            type="text"
+            value={customerNameDraft}
+            onChange={(event) => setCustomerNameDraft(event.target.value)}
+            placeholder="Customer name"
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          />
+          <input
+            type="email"
+            value={customerEmailDraft}
+            onChange={(event) => setCustomerEmailDraft(event.target.value)}
+            placeholder="Customer email"
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          />
+          <input
+            type="text"
+            value={customerPhoneDraft}
+            onChange={(event) => setCustomerPhoneDraft(event.target.value)}
+            placeholder="Customer phone"
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          />
+          <input
+            type="text"
+            value={serviceIdDraft}
+            onChange={(event) => setServiceIdDraft(event.target.value)}
+            placeholder="Services"
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          />
+          <select
+            value={String(scheduledDurationDraft)}
+            onChange={(event) => setScheduledDurationDraft(Number(event.target.value) || 60)}
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          >
+            <option value="30">30 minutes</option>
+            <option value="45">45 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="90">1.5 hours</option>
+            <option value="120">2 hours</option>
+            <option value="180">3 hours</option>
+          </select>
+          <input
+            type="text"
+            value={propertySqftDraft}
+            onChange={(event) => setPropertySqftDraft(event.target.value)}
+            placeholder="Property sqft"
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          />
+          <input
+            type="text"
+            value={yardSqftDraft}
+            onChange={(event) => setYardSqftDraft(event.target.value)}
+            placeholder="Yard sqft"
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          />
+          <input
+            type="text"
+            value={packageIdDraft}
+            onChange={(event) => setPackageIdDraft(event.target.value)}
+            placeholder="Package"
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          />
+          <input
+            type="text"
+            value={addressDraft}
+            onChange={(event) => setAddressDraft(event.target.value)}
+            placeholder="Street address"
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          />
+          <input
+            type="text"
+            value={cityDraft}
+            onChange={(event) => setCityDraft(event.target.value)}
+            placeholder="City"
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          />
+          <input
+            type="text"
+            value={stateDraft}
+            onChange={(event) => setStateDraft(event.target.value)}
+            placeholder="State"
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          />
+          <input
+            type="text"
+            value={zipCodeDraft}
+            onChange={(event) => setZipCodeDraft(event.target.value)}
+            placeholder="ZIP code"
+            className="px-2 py-1 border border-gray-300 rounded text-xs"
+          />
+        </div>
+        <textarea
+          value={serviceDetailsDraft}
+          onChange={(event) => setServiceDetailsDraft(event.target.value)}
+          placeholder="Service details"
+          className="w-full min-h-20 px-2 py-1 border border-gray-300 rounded text-xs"
+        />
+        <button
+          onClick={() => void onSaveBookingDetails(booking.id, {
+            customer_name: customerNameDraft,
+            customer_email: customerEmailDraft,
+            customer_phone: customerPhoneDraft,
+            service_id: serviceIdDraft,
+            service_details: serviceDetailsDraft,
+            scheduled_duration_minutes: scheduledDurationDraft,
+            property_sqft: propertySqftDraft,
+            yard_sqft: yardSqftDraft,
+            package_id: packageIdDraft,
+            address: addressDraft,
+            city: cityDraft,
+            state: stateDraft,
+            zip_code: zipCodeDraft,
+          })}
+          disabled={actionLoading === booking.id + 'details'}
+          className="px-2 py-1 text-xs bg-slate-800 text-white rounded hover:bg-black disabled:opacity-50"
+        >
+          {actionLoading === booking.id + 'details' ? 'Saving...' : 'Save Booking Details'}
+        </button>
+      </div>
+
+      <button
+        onClick={() => void onDeleteBooking(booking.id)}
+        disabled={actionLoading === booking.id + 'delete'}
+        className="mt-2 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+      >
+        {actionLoading === booking.id + 'delete' ? 'Deleting...' : 'Delete Booking'}
+      </button>
+    </div>
+  );
 }
 
 export default function EmployeeCalendarPage() {
@@ -294,6 +480,33 @@ export default function EmployeeCalendarPage() {
     }
   };
 
+  const saveBookingDetails = async (bookingId: string, updates: BookingDetailUpdates) => {
+    setActionLoading(bookingId + 'details');
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body?.error || 'Failed to save booking details');
+      }
+
+      setMessage('Booking details saved successfully.');
+      await loadData();
+      await loadDateSlots(selectedDate);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save booking details');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/';
@@ -485,21 +698,13 @@ export default function EmployeeCalendarPage() {
                     ) : (
                       <div className="mt-3 space-y-3">
                         {bookingsAtTime.map((booking) => (
-                          <div key={booking.id} className="rounded border border-gray-200 bg-white p-3">
-                            <p className="text-sm font-semibold text-gray-900">{booking.customer_name || 'Customer'}</p>
-                            <p className="text-xs text-gray-600">{prettyService(booking.service_id)}</p>
-                            <p className="text-xs text-gray-600">Status: {prettyStatus(booking.status)}</p>
-                            <p className="text-xs text-gray-600">Phone: {booking.customer_phone || 'N/A'}</p>
-                            <p className="text-xs text-gray-600">Email: {booking.customer_email || 'N/A'}</p>
-                            <p className="text-xs text-gray-600">Address: {formatAddress(booking) || 'N/A'}</p>
-                            <button
-                              onClick={() => void deleteBooking(booking.id)}
-                              disabled={actionLoading === booking.id + 'delete'}
-                              className="mt-2 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
-                            >
-                              {actionLoading === booking.id + 'delete' ? 'Deleting...' : 'Delete Booking'}
-                            </button>
-                          </div>
+                          <BookingSlotCard
+                            key={booking.id}
+                            booking={booking}
+                            actionLoading={actionLoading}
+                            onDeleteBooking={deleteBooking}
+                            onSaveBookingDetails={saveBookingDetails}
+                          />
                         ))}
                       </div>
                     )}

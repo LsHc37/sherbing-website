@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
       `Selected package: ${JSON.stringify(selectedPackage)}`,
       'Lawn mowing pricing uses the following tiers: Small/Patio under 4000 sqft = $35 weekly or $45 bi-weekly; Standard Subdivision 4000-7000 sqft = $45 weekly or $55 bi-weekly; Large/Corner Lot 7000-10000 sqft = $55 weekly or $70 bi-weekly; Estate/Oversized 10000-13000 sqft = $65 weekly or $85 bi-weekly; Acreage/Custom 13000+ sqft = $65 weekly plus $10 per extra 3000 sqft, and bi-weekly should be custom-priced higher because of overgrowth risk. Add 1.5x for initial overgrowth cuts, +$10 for bagging clippings, +$15 for heavy pet waste, and treat blocked access or locked gates as full-charge jobs.',
       'Window cleaning pricing uses a $30 trip charge, $5 per exterior window, $8 per interior-and-exterior window, and $2 per screen/track add-on.',
-      'Gutter cleaning pricing uses home size and story count only: small under 1500 sqft = $105 single-story or $150 two-story, medium 1500-2500 sqft = $140 single-story or $210 two-story, large 2500+ sqft = $180 single-story or $275 two-story.',
+      'Gutter cleaning pricing uses home size and story count only: small under 1500 sqft = $90 single-story or $130 two-story, medium 1500-2500 sqft = $120 single-story or $180 two-story, large 2500+ sqft = $155 single-story or $235 two-story.',
       `Customer notes: ${notes || 'none'}`,
       `Known property sqft from user (if any): ${property_sqft || 'unknown'}`,
       `Known yard sqft from user (if any): ${yard_sqft || 'unknown'}`,

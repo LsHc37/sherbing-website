@@ -68,8 +68,12 @@ export async function POST(request: NextRequest) {
 
     const scheduledDate = String(body.scheduled_date || '').trim();
     const scheduledTime = String(body.scheduled_time || '').trim();
+    const scheduledDurationMinutesRaw = Number(body.scheduled_duration_minutes || 60);
+    const scheduledDurationMinutes = Number.isFinite(scheduledDurationMinutesRaw)
+      ? Math.max(30, Math.min(480, Math.round(scheduledDurationMinutesRaw / 15) * 15))
+      : 60;
     if (scheduledDate && scheduledTime) {
-      const isAvailable = await isBookingSlotAvailable(scheduledDate, scheduledTime);
+      const isAvailable = await isBookingSlotAvailable(scheduledDate, scheduledTime, undefined, scheduledDurationMinutes);
       if (!isAvailable) {
         return NextResponse.json({ error: 'That time slot was just booked. Please choose another time.' }, { status: 409 });
       }
@@ -81,6 +85,7 @@ export async function POST(request: NextRequest) {
       booking_id: `SHERBING-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`,
       estimated_price: enforceMinimumCustomerPrice(Number(body.estimated_price || 0)),
       service_details: buildServiceDetails(body as Record<string, unknown>),
+      scheduled_duration_minutes: Number.isFinite(scheduledDurationMinutes) ? scheduledDurationMinutes : 60,
     };
 
     // Booking should only succeed if persistence succeeds.

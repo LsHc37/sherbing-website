@@ -17,15 +17,17 @@ const FALLBACK_SLOT_TIMES = [
 export async function GET(request: NextRequest) {
   try {
     const date = request.nextUrl.searchParams.get('date') || '';
+    const durationMinutes = Number(request.nextUrl.searchParams.get('durationMinutes') || '60');
     if (!date) {
       return NextResponse.json({ error: 'date query parameter is required' }, { status: 400 });
     }
 
-    const slots = await getBookingAvailabilityForDate(date);
+    const slots = await getBookingAvailabilityForDate(date, durationMinutes);
     const bookedCount = slots.filter((slot) => slot.status === 'booked').length;
 
     return NextResponse.json({
       date,
+      durationMinutes,
       slots,
       openCount: slots.length - bookedCount,
       bookedCount,

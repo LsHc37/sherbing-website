@@ -19,6 +19,7 @@ type BookingSheetRow = {
   yard_sqft: string;
   scheduled_date?: string;
   scheduled_time?: string;
+  scheduled_duration_minutes?: string;
   estimated_price: string;
   customer_price: string;
   sherbing_fee: string;
@@ -266,6 +267,7 @@ export async function initializeSheet() {
     'Status',
     'Assigned Employee',
     'Customer Update Request',
+    'Scheduled Duration Minutes',
   ];
 
   const userHeaders = [
@@ -350,6 +352,7 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       yard_sqft: getByAliases(row, ['Yard Size (sqft)', 'yard_sqft']),
       scheduled_date: getByAliases(row, ['Scheduled Date', 'scheduled_date']),
       scheduled_time: getByAliases(row, ['Scheduled Time', 'scheduled_time']),
+      scheduled_duration_minutes: getByAliases(row, ['Scheduled Duration Minutes', 'scheduled_duration_minutes', 'Duration Minutes', 'duration_minutes']),
       estimated_price: getByAliases(row, ['Estimated Price', 'estimated_price']) || '0',
       customer_price: getByAliases(row, ['Customer Price', 'customer_price']),
       sherbing_fee: getByAliases(row, ['Sherbing Fee', 'sherbing_fee']),
@@ -388,6 +391,7 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       status: (hasServiceDetailsColumn ? getAt(row, 22) : getAt(row, 21)) || 'pending',
       assigned_employee: hasServiceDetailsColumn ? getAt(row, 23) : getAt(row, 22),
       customer_update_request: hasServiceDetailsColumn ? getAt(row, 24) : getAt(row, 23),
+      scheduled_duration_minutes: hasServiceDetailsColumn ? getAt(row, 25) : getAt(row, 24),
     };
 
     const usePositional = scoreCandidate(positionalBase) > scoreCandidate(headerBasedBase);
@@ -421,6 +425,7 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       yard_sqft: base.yard_sqft,
       scheduled_date: base.scheduled_date,
       scheduled_time: base.scheduled_time,
+      scheduled_duration_minutes: base.scheduled_duration_minutes,
       estimated_price: base.estimated_price || '0',
       customer_price: base.customer_price || String(payout.customerPrice),
       sherbing_fee: base.sherbing_fee || String(payout.sherbingFee),
@@ -512,6 +517,7 @@ export async function addBookingToSheet(booking: BookingForm & { booking_id: str
       'pending',
       '',
       '',
+      String(booking.scheduled_duration_minutes ?? 60),
     ]];
 
     await withRetry(() => sheets.spreadsheets.values.append({
@@ -549,18 +555,55 @@ export type EmployeeAvailabilityEntry = {
   until?: string;
 };
 
-const DEFAULT_BOOKING_TIME_SLOTS = [
-  '08:00',
-  '09:00',
-  '10:00',
-  '11:00',
-  '12:00',
-  '13:00',
-  '14:00',
-  '15:00',
-  '16:00',
-  '17:00',
-];
+const BOOKING_SLOT_INTERVAL_MINUTES = 30;
+const BOOKING_DAY_START_MINUTES = 8 * 60;
+const BOOKING_DAY_END_MINUTES = 18 * 60;
+
+function minutesToTimeString(totalMinutes: number) {
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function timeStringToMinutes(value: string) {
+  const normalized = normalizeTimeString(value);
+  const match = normalized.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return NaN;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function buildDefaultBookingTimeSlots() {
+  const slots: string[] = [];
+  for (let minute = BOOKING_DAY_START_MINUTES; minute < BOOKING_DAY_END_MINUTES; minute += BOOKING_SLOT_INTERVAL_MINUTES) {
+    slots.push(minutesToTimeString(minute));
+  }
+  return slots;
+}
+
+const DEFAULT_BOOKING_TIME_SLOTS = buildDefaultBookingTimeSlots();
+
+function parseDurationMinutes(value?: string | number) {
+  const parsed = Number(String(value ?? '').trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) return 60;
+  return Math.max(30, Math.min(480, Math.round(parsed / 15) * 15));
+}
+
+function bookingIntervalOverlapsTime(startMinutes: number, endMinutes: number, slotMinutes: number) {
+  return slotMinutes >= startMinutes && slotMinutes < endMinutes;
+}
+
+function getBookingStartEndMinutes(booking: BookingSheetRow) {
+  const startMinutes = timeStringToMinutes(String(booking.scheduled_time || ''));
+  if (!Number.isFinite(startMinutes)) {
+    return null;
+  }
+
+  const durationMinutes = parseDurationMinutes(booking.scheduled_duration_minutes);
+  return {
+    startMinutes,
+    endMinutes: startMinutes + durationMinutes,
+  };
+}
 
 function normalizeDateString(value?: string) {
   const raw = String(value || '').trim();
@@ -703,7 +746,7 @@ export function parseEmployeeAvailabilityEntries(raw: string | undefined): Emplo
     .filter((entry): entry is EmployeeAvailabilityEntry => Boolean(entry));
 }
 
-export async function getBookingAvailabilityForDate(date: string): Promise<BookingAvailabilitySlot[]> {
+export async function getBookingAvailabilityForDate(date: string, requestedDurationMinutes = 60): Promise<BookingAvailabilitySlot[]> {
   const targetDate = normalizeDateString(date);
   if (!targetDate) {
     return DEFAULT_BOOKING_TIME_SLOTS.map((time) => ({ time, status: 'open' }));
@@ -711,14 +754,10 @@ export async function getBookingAvailabilityForDate(date: string): Promise<Booki
 
   const bookings = await listBookingsFromSheet();
   const users = await listUsersFromSheet();
-  const bookedCountsByTime = new Map<string, number>();
-  for (const booking of bookings) {
-    if (normalizeDateString(booking.scheduled_date) !== targetDate) continue;
-    if (!isBookingBlockingSlot(booking.status)) continue;
-    const normalizedTime = normalizeTimeString(booking.scheduled_time);
-    if (!normalizedTime) continue;
-    bookedCountsByTime.set(normalizedTime, (bookedCountsByTime.get(normalizedTime) || 0) + 1);
-  }
+  const dayBookings = bookings.filter((booking) => (
+    normalizeDateString(booking.scheduled_date) === targetDate
+    && isBookingBlockingSlot(booking.status)
+  ));
 
   const activeWorkers = users.filter((user) => {
     const role = String(user.role || '').toLowerCase();
@@ -749,19 +788,38 @@ export async function getBookingAvailabilityForDate(date: string): Promise<Booki
     }, 0);
   };
 
-  return DEFAULT_BOOKING_TIME_SLOTS.map((time) => ({
-    time,
-    status: (() => {
-      const workerCapacity = availableWorkerCountAtTime(time);
-      if (workerCapacity <= 0) return 'booked';
+  const normalizedDuration = parseDurationMinutes(requestedDurationMinutes);
+  const slotTimesWithMinutes = DEFAULT_BOOKING_TIME_SLOTS.map((time) => ({ time, minutes: timeStringToMinutes(time) }));
 
-      const bookedCount = bookedCountsByTime.get(time) || 0;
-      return bookedCount >= workerCapacity ? 'booked' : 'open';
-    })(),
-  }));
+  return slotTimesWithMinutes.map(({ time, minutes }) => {
+    const intervalEnd = minutes + normalizedDuration;
+    const slotsCoveredByBooking = slotTimesWithMinutes.filter((slot) => slot.minutes >= minutes && slot.minutes < intervalEnd);
+
+    if (slotsCoveredByBooking.length === 0) {
+      return { time, status: 'booked' as const };
+    }
+
+    const canFit = slotsCoveredByBooking.every((slot) => {
+      const workerCapacity = availableWorkerCountAtTime(slot.time);
+      if (workerCapacity <= 0) return false;
+
+      const overlappingBookings = dayBookings.reduce((count, booking) => {
+        const interval = getBookingStartEndMinutes(booking);
+        if (!interval) return count;
+        return bookingIntervalOverlapsTime(interval.startMinutes, interval.endMinutes, slot.minutes) ? count + 1 : count;
+      }, 0);
+
+      return overlappingBookings < workerCapacity;
+    });
+
+    return {
+      time,
+      status: canFit ? ('open' as const) : ('booked' as const),
+    };
+  });
 }
 
-export async function isBookingSlotAvailable(date: string, time: string, excludeBookingId?: string) {
+export async function isBookingSlotAvailable(date: string, time: string, excludeBookingId?: string, requestedDurationMinutes = 60) {
   const targetDate = normalizeDateString(date);
   const targetTime = normalizeTimeString(time);
   if (!targetDate || !targetTime) return true;
@@ -775,39 +833,48 @@ export async function isBookingSlotAvailable(date: string, time: string, exclude
     return isActive && (role === 'employee' || role === 'admin');
   });
 
-  const workerCapacity = activeWorkers.reduce((count, worker) => {
+  const workerCapacityAtTime = (timeLabel: string) => activeWorkers.reduce((count, worker) => {
     const entries = parseEmployeeAvailabilityEntries(worker.available_dates);
     const openWindows = entries.filter((entry) => entry.type === 'open' && appliesOnDate(entry, targetDate));
     if (openWindows.length === 0) return count;
 
-    const withinOpen = openWindows.some((entry) => isTimeWithinRange(targetTime, entry.start, entry.end));
+    const withinOpen = openWindows.some((entry) => isTimeWithinRange(timeLabel, entry.start, entry.end));
     if (!withinOpen) return count;
 
     const blockedWindows = entries.filter((entry) => entry.type === 'blocked' && appliesOnDate(entry, targetDate));
-    const blocked = blockedWindows.some((entry) => isTimeWithinRange(targetTime, entry.start, entry.end));
+    const blocked = blockedWindows.some((entry) => isTimeWithinRange(timeLabel, entry.start, entry.end));
     if (blocked) return count;
 
     return count + 1;
   }, 0);
 
-  if (workerCapacity <= 0) return false;
+  const targetStartMinutes = timeStringToMinutes(targetTime);
+  const targetDuration = parseDurationMinutes(requestedDurationMinutes);
+  const targetEndMinutes = targetStartMinutes + targetDuration;
+  const slotTimesWithMinutes = DEFAULT_BOOKING_TIME_SLOTS.map((slotTime) => ({
+    time: slotTime,
+    minutes: timeStringToMinutes(slotTime),
+  }));
+  const requestedSlots = slotTimesWithMinutes.filter((slot) => slot.minutes >= targetStartMinutes && slot.minutes < targetEndMinutes);
+  if (requestedSlots.length === 0) return false;
 
-  const bookedCount = bookings.reduce((count, booking) => {
-    const sameBooking = excludeBookingId && booking.booking_id === excludeBookingId;
-    if (sameBooking) return count;
+  return requestedSlots.every((slot) => {
+    const workerCapacity = workerCapacityAtTime(slot.time);
+    if (workerCapacity <= 0) return false;
 
-    if (
-      normalizeDateString(booking.scheduled_date) === targetDate
-      && normalizeTimeString(booking.scheduled_time) === targetTime
-      && isBookingBlockingSlot(booking.status)
-    ) {
-      return count + 1;
-    }
+    const overlappingBookings = bookings.reduce((count, booking) => {
+      const sameBooking = excludeBookingId && bookingIdsMatch(booking.booking_id, excludeBookingId);
+      if (sameBooking) return count;
+      if (normalizeDateString(booking.scheduled_date) !== targetDate) return count;
+      if (!isBookingBlockingSlot(booking.status)) return count;
 
-    return count;
-  }, 0);
+      const interval = getBookingStartEndMinutes(booking);
+      if (!interval) return count;
+      return bookingIntervalOverlapsTime(interval.startMinutes, interval.endMinutes, slot.minutes) ? count + 1 : count;
+    }, 0);
 
-  return bookedCount < workerCapacity;
+    return overlappingBookings < workerCapacity;
+  });
 }
 
 export async function clearAllBookingsInSheet() {
@@ -865,7 +932,28 @@ export async function findBookingById(bookingId: string) {
 
 export async function updateBookingInSheet(
   bookingId: string,
-  updates: Partial<Pick<BookingSheetRow, 'status' | 'assigned_employee' | 'customer_update_request' | 'notes' | 'scheduled_date' | 'scheduled_time'>>
+  updates: Partial<Pick<BookingSheetRow,
+    | 'status'
+    | 'assigned_employee'
+    | 'customer_update_request'
+    | 'notes'
+    | 'scheduled_date'
+    | 'scheduled_time'
+    | 'scheduled_duration_minutes'
+    | 'customer_name'
+    | 'customer_email'
+    | 'customer_phone'
+    | 'service'
+    | 'service_details'
+    | 'property_sqft'
+    | 'yard_sqft'
+    | 'package'
+    | 'address'
+    | 'city'
+    | 'state'
+    | 'zip_code'
+    | 'city_state_zip'
+  >>
 ) {
   const client = await getSheetsClient();
   if (!client) return { success: false, error: 'Google Sheets not configured' };
@@ -885,18 +973,45 @@ export async function updateBookingInSheet(
   if (bookingIndex === -1) return { success: false, error: 'Booking not found' };
 
   const row = rows[bookingIndex];
-  const set = (header: string, value?: string) => {
-    const index = headers.indexOf(header);
-    if (index === -1 || value === undefined) return;
-    row[index] = value;
+  const setByAliases = (aliases: string[], value?: string) => {
+    if (value === undefined) return;
+    const indexes = findHeaderIndexes(headers, aliases);
+    if (indexes.length === 0) return;
+    row[indexes[0]] = value;
+  };
+  const getByAliases = (aliases: string[]) => {
+    const indexes = findHeaderIndexes(headers, aliases);
+    if (indexes.length === 0) return '';
+    return String(row[indexes[0]] || '').trim();
   };
 
-  set('Status', updates.status);
-  set('Assigned Employee', updates.assigned_employee);
-  set('Scheduled Date', updates.scheduled_date);
-  set('Scheduled Time', updates.scheduled_time);
-  set('Customer Update Request', updates.customer_update_request);
-  set('Notes', updates.notes);
+  setByAliases(['Status', 'status'], updates.status);
+  setByAliases(['Assigned Employee', 'assigned_employee'], updates.assigned_employee);
+  setByAliases(['Scheduled Date', 'scheduled_date'], updates.scheduled_date);
+  setByAliases(['Scheduled Time', 'scheduled_time'], updates.scheduled_time);
+  setByAliases(['Scheduled Duration Minutes', 'scheduled_duration_minutes', 'Duration Minutes', 'duration_minutes'], updates.scheduled_duration_minutes);
+  setByAliases(['Customer Update Request', 'customer_update_request'], updates.customer_update_request);
+  setByAliases(['Notes', 'notes'], updates.notes);
+  setByAliases(['Customer Name', 'customer_name', 'Name'], updates.customer_name);
+  setByAliases(['Email', 'customer_email'], updates.customer_email);
+  setByAliases(['Phone', 'customer_phone'], updates.customer_phone);
+  setByAliases(['Service', 'service_id', 'service'], updates.service);
+  setByAliases(['Service Details', 'service_details'], updates.service_details);
+  setByAliases(['Property Size (sqft)', 'property_sqft'], updates.property_sqft);
+  setByAliases(['Yard Size (sqft)', 'yard_sqft'], updates.yard_sqft);
+  setByAliases(['Package', 'package_id'], updates.package);
+  setByAliases(['Address', 'address'], updates.address);
+  setByAliases(['City', 'city'], updates.city);
+  setByAliases(['State', 'state'], updates.state);
+  setByAliases(['ZIP', 'zip_code', 'zip'], updates.zip_code);
+
+  const resolvedCity = updates.city ?? getByAliases(['City', 'city']);
+  const resolvedState = updates.state ?? getByAliases(['State', 'state']);
+  const resolvedZip = updates.zip_code ?? getByAliases(['ZIP', 'zip_code', 'zip']);
+  const cityStateZip = [resolvedCity, `${resolvedState} ${resolvedZip}`.trim()].filter(Boolean).join(', ').trim();
+  if (cityStateZip) {
+    setByAliases(['City/State/ZIP', 'city_state_zip'], cityStateZip);
+  }
 
   const endColumn = columnNumberToName(headers.length);
   const range = `${bookingsTabName()}!A${bookingIndex + 1}:${endColumn}${bookingIndex + 1}`;

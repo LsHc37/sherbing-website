@@ -57,6 +57,7 @@ export default function BookingContent() {
     customer_phone: '',
     scheduled_date: '',
     scheduled_time: '',
+    scheduled_duration_minutes: 60,
     notes: '',
   });
 
@@ -139,6 +140,15 @@ export default function BookingContent() {
       return;
     }
 
+    if (name === 'scheduled_duration_minutes') {
+      setFormData((prev) => ({
+        ...prev,
+        scheduled_duration_minutes: Number(value) || 60,
+        scheduled_time: '',
+      }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -146,7 +156,9 @@ export default function BookingContent() {
   };
 
   const fetchAvailabilityForDate = useCallback(async (date: string): Promise<AvailabilitySlot[]> => {
-    const response = await fetch(`/api/bookings/availability?date=${encodeURIComponent(date)}`);
+    const response = await fetch(
+      `/api/bookings/availability?date=${encodeURIComponent(date)}&durationMinutes=${encodeURIComponent(String(formData.scheduled_duration_minutes || 60))}`
+    );
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(body?.error || 'Failed to load availability');
@@ -157,7 +169,7 @@ export default function BookingContent() {
     }
 
     return Array.isArray(body?.slots) ? (body.slots as AvailabilitySlot[]) : [];
-  }, []);
+  }, [formData.scheduled_duration_minutes]);
 
   const loadAvailability = useCallback(async (date: string) => {
     if (!date) {
@@ -640,7 +652,7 @@ export default function BookingContent() {
           {/* Schedule */}
           <div className="surface-card p-8 appear-up stagger-4">
             <h2 className="text-2xl font-bold text-slate-900 mb-6">5. Schedule Service</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <input
                 type="date"
                 name="scheduled_date"
@@ -649,6 +661,19 @@ export default function BookingContent() {
                 min={minimumScheduleDate}
                 className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
+              <select
+                name="scheduled_duration_minutes"
+                value={String(formData.scheduled_duration_minutes || 60)}
+                onChange={handleInputChange}
+                className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              >
+                <option value="30">30 minutes</option>
+                <option value="45">45 minutes</option>
+                <option value="60">1 hour</option>
+                <option value="90">1.5 hours</option>
+                <option value="120">2 hours</option>
+                <option value="180">3 hours</option>
+              </select>
               <div className="px-4 py-3 border border-slate-200 rounded-lg bg-slate-50 text-sm text-slate-600 flex items-center">
                 {formData.scheduled_time ? `Selected time: ${formData.scheduled_time}` : 'Select a date to view open times'}
               </div>

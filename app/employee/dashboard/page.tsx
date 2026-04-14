@@ -27,6 +27,7 @@ type Booking = {
   zip_code: string;
   scheduled_date?: string;
   scheduled_time?: string;
+  scheduled_duration_minutes?: number;
   estimated_price: number;
   customer_price: number;
   sherbing_fee: number;
@@ -102,14 +103,41 @@ function includesSearchTerm(booking: Booking, term: string): boolean {
 type BookingCardProps = {
   booking: Booking;
   actionLoading: string | null;
-  onUpdateSchedule: (bookingId: string, scheduledDate: string, scheduledTime: string) => Promise<void>;
+  onUpdateSchedule: (bookingId: string, scheduledDate: string, scheduledTime: string, scheduledDurationMinutes: number) => Promise<void>;
+  onSaveBookingDetails: (bookingId: string, updates: {
+    customer_name: string;
+    customer_email: string;
+    customer_phone: string;
+    service_id: string;
+    service_details: string;
+    property_sqft: string;
+    yard_sqft: string;
+    package_id: string;
+    address: string;
+    city: string;
+    state: string;
+    zip_code: string;
+  }) => Promise<void>;
   onDeleteBooking: (bookingId: string) => Promise<void>;
 };
 
-function BookingCard({ booking, actionLoading, onUpdateSchedule, onDeleteBooking }: BookingCardProps) {
+function BookingCard({ booking, actionLoading, onUpdateSchedule, onSaveBookingDetails, onDeleteBooking }: BookingCardProps) {
   const services = parseServices(booking.service_id);
   const [scheduledDateDraft, setScheduledDateDraft] = useState(booking.scheduled_date || '');
   const [scheduledTimeDraft, setScheduledTimeDraft] = useState(booking.scheduled_time || '');
+  const [scheduledDurationDraft, setScheduledDurationDraft] = useState(Number(booking.scheduled_duration_minutes || 60));
+  const [customerNameDraft, setCustomerNameDraft] = useState(booking.customer_name || '');
+  const [customerEmailDraft, setCustomerEmailDraft] = useState(booking.customer_email || '');
+  const [customerPhoneDraft, setCustomerPhoneDraft] = useState(booking.customer_phone || '');
+  const [serviceIdDraft, setServiceIdDraft] = useState(booking.service_id || '');
+  const [serviceDetailsDraft, setServiceDetailsDraft] = useState(booking.service_details || '');
+  const [propertySqftDraft, setPropertySqftDraft] = useState(booking.property_sqft || '');
+  const [yardSqftDraft, setYardSqftDraft] = useState(booking.yard_sqft || '');
+  const [packageIdDraft, setPackageIdDraft] = useState(booking.package_id || '');
+  const [addressDraft, setAddressDraft] = useState(booking.address || '');
+  const [cityDraft, setCityDraft] = useState(booking.city || '');
+  const [stateDraft, setStateDraft] = useState(booking.state || '');
+  const [zipCodeDraft, setZipCodeDraft] = useState(booking.zip_code || '');
 
   return (
     <article className="p-6">
@@ -143,6 +171,7 @@ function BookingCard({ booking, actionLoading, onUpdateSchedule, onDeleteBooking
             <p><span className="font-medium text-gray-800">Phone:</span> {booking.customer_phone || 'N/A'}</p>
             <p><span className="font-medium text-gray-800">Scheduled Date:</span> {booking.scheduled_date || 'TBD'}</p>
             <p><span className="font-medium text-gray-800">Scheduled Time:</span> {booking.scheduled_time || 'TBD'}</p>
+            <p><span className="font-medium text-gray-800">Duration:</span> {Number(booking.scheduled_duration_minutes || 60)} minutes</p>
             <p><span className="font-medium text-gray-800">Quoted Price:</span> {formatMoney(Number(booking.customer_price || booking.estimated_price || 0))}</p>
           </div>
 
@@ -159,12 +188,133 @@ function BookingCard({ booking, actionLoading, onUpdateSchedule, onDeleteBooking
               onChange={(event) => setScheduledTimeDraft(event.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-md text-sm"
             />
+            <select
+              value={String(scheduledDurationDraft)}
+              onChange={(event) => setScheduledDurationDraft(Number(event.target.value) || 60)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+            >
+              <option value="30">30m</option>
+              <option value="45">45m</option>
+              <option value="60">1h</option>
+              <option value="90">1.5h</option>
+              <option value="120">2h</option>
+              <option value="180">3h</option>
+            </select>
             <button
-              onClick={() => void onUpdateSchedule(booking.id, scheduledDateDraft, scheduledTimeDraft)}
+              onClick={() => void onUpdateSchedule(booking.id, scheduledDateDraft, scheduledTimeDraft, scheduledDurationDraft)}
               disabled={actionLoading === booking.id + 'schedule'}
               className="px-3 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-50"
             >
               {actionLoading === booking.id + 'schedule' ? 'Saving...' : 'Save Schedule'}
+            </button>
+          </div>
+
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-3 max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">Edit Booking Details</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <input
+                type="text"
+                value={customerNameDraft}
+                onChange={(event) => setCustomerNameDraft(event.target.value)}
+                placeholder="Customer name"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <input
+                type="email"
+                value={customerEmailDraft}
+                onChange={(event) => setCustomerEmailDraft(event.target.value)}
+                placeholder="Customer email"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <input
+                type="text"
+                value={customerPhoneDraft}
+                onChange={(event) => setCustomerPhoneDraft(event.target.value)}
+                placeholder="Customer phone"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <input
+                type="text"
+                value={serviceIdDraft}
+                onChange={(event) => setServiceIdDraft(event.target.value)}
+                placeholder="Service(s), comma separated"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <input
+                type="text"
+                value={propertySqftDraft}
+                onChange={(event) => setPropertySqftDraft(event.target.value)}
+                placeholder="Property sqft"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <input
+                type="text"
+                value={yardSqftDraft}
+                onChange={(event) => setYardSqftDraft(event.target.value)}
+                placeholder="Yard sqft"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <input
+                type="text"
+                value={packageIdDraft}
+                onChange={(event) => setPackageIdDraft(event.target.value)}
+                placeholder="Package"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <input
+                type="text"
+                value={addressDraft}
+                onChange={(event) => setAddressDraft(event.target.value)}
+                placeholder="Street address"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <input
+                type="text"
+                value={cityDraft}
+                onChange={(event) => setCityDraft(event.target.value)}
+                placeholder="City"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <input
+                type="text"
+                value={stateDraft}
+                onChange={(event) => setStateDraft(event.target.value)}
+                placeholder="State"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+              <input
+                type="text"
+                value={zipCodeDraft}
+                onChange={(event) => setZipCodeDraft(event.target.value)}
+                placeholder="ZIP code"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+            </div>
+            <textarea
+              value={serviceDetailsDraft}
+              onChange={(event) => setServiceDetailsDraft(event.target.value)}
+              placeholder="Service details"
+              className="w-full min-h-24 px-3 py-2 border border-gray-300 rounded-md text-sm"
+            />
+            <button
+              onClick={() => void onSaveBookingDetails(booking.id, {
+                customer_name: customerNameDraft,
+                customer_email: customerEmailDraft,
+                customer_phone: customerPhoneDraft,
+                service_id: serviceIdDraft,
+                service_details: serviceDetailsDraft,
+                property_sqft: propertySqftDraft,
+                yard_sqft: yardSqftDraft,
+                package_id: packageIdDraft,
+                address: addressDraft,
+                city: cityDraft,
+                state: stateDraft,
+                zip_code: zipCodeDraft,
+              })}
+              disabled={actionLoading === booking.id + 'details'}
+              className="px-3 py-2 bg-slate-800 text-white text-sm rounded-md hover:bg-black disabled:opacity-50"
+            >
+              {actionLoading === booking.id + 'details' ? 'Saving...' : 'Save Booking Details'}
             </button>
           </div>
 
@@ -285,7 +435,7 @@ export default function EmployeeDashboardPage() {
     return bookings.reduce((sum, booking) => sum + Number(booking.customer_price || booking.estimated_price || 0), 0);
   }, [bookings]);
 
-  const updateSchedule = async (bookingId: string, scheduledDate: string, scheduledTime: string): Promise<void> => {
+  const updateSchedule = async (bookingId: string, scheduledDate: string, scheduledTime: string, scheduledDurationMinutes: number): Promise<void> => {
     setActionLoading(bookingId + 'schedule');
     setError('');
     setMessage('');
@@ -297,6 +447,7 @@ export default function EmployeeDashboardPage() {
         body: JSON.stringify({
           scheduled_date: scheduledDate,
           scheduled_time: scheduledTime,
+          scheduled_duration_minutes: scheduledDurationMinutes,
         }),
       });
 
@@ -353,6 +504,57 @@ export default function EmployeeDashboardPage() {
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete booking');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const saveBookingDetails = async (
+    bookingId: string,
+    updates: {
+      customer_name: string;
+      customer_email: string;
+      customer_phone: string;
+      service_id: string;
+      service_details: string;
+      property_sqft: string;
+      yard_sqft: string;
+      package_id: string;
+      address: string;
+      city: string;
+      state: string;
+      zip_code: string;
+    }
+  ): Promise<void> => {
+    setActionLoading(bookingId + 'details');
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      const raw = await response.text();
+      let body: { error?: string } = {};
+      if (raw) {
+        try {
+          body = JSON.parse(raw) as { error?: string };
+        } catch {
+          body = {};
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(body?.error || 'Failed to save booking details');
+      }
+
+      setMessage('Booking details saved successfully.');
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save booking details');
     } finally {
       setActionLoading(null);
     }
@@ -462,6 +664,7 @@ export default function EmployeeDashboardPage() {
                   booking={booking}
                   actionLoading={actionLoading}
                   onUpdateSchedule={updateSchedule}
+                  onSaveBookingDetails={saveBookingDetails}
                   onDeleteBooking={deleteBooking}
                 />
               ))}

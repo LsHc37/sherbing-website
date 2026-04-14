@@ -81,7 +81,7 @@ export const SERVICE_PRICING: Record<string, PricingRule> = {
   gutter_cleaning: { 
     name: 'Gutter Cleaning', 
     pricePerSqft: 0, 
-    minimumPrice: 90, 
+    minimumPrice: 75, 
     description: 'Professional gutter cleaning priced by home size and number of stories.',
     images: ['/services/gutter-cleaning-1.jpg']
   },
@@ -194,14 +194,14 @@ function estimateGutterCleaningPrice(
   let baseCharge = 0;
 
   if (homeSize < 1500) {
-    baseCharge = storyCount >= 2 ? 150 : 105;
+    baseCharge = storyCount >= 2 ? 130 : 90;
   } else if (homeSize < 2500) {
-    baseCharge = storyCount >= 2 ? 210 : 140;
+    baseCharge = storyCount >= 2 ? 180 : 120;
   } else {
-    baseCharge = storyCount >= 2 ? 275 : 180;
+    baseCharge = storyCount >= 2 ? 235 : 155;
   }
 
-  return Math.max(baseCharge, 90);
+  return Math.max(baseCharge, 75);
 }
 
 export function calculateEstimatePrice(serviceId: string, propertySqft: number, yardSqft: number, context?: EstimateContext): number {
