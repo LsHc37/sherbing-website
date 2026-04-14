@@ -132,7 +132,7 @@ export default function AdminBookingsPage() {
     setSavingId(bookingId);
     setMessage('');
 
-    const response = await fetch(`/api/bookings/${bookingId}`, {
+    const response = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(edit),

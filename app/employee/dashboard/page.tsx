@@ -291,7 +291,7 @@ export default function EmployeeDashboardPage() {
     setMessage('');
 
     try {
-      const response = await fetch(`/api/bookings/${bookingId}`, {
+      const response = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -331,7 +331,7 @@ export default function EmployeeDashboardPage() {
     setMessage('');
 
     try {
-      const response = await fetch(`/api/bookings/${bookingId}`, {
+      const response = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, {
         method: 'DELETE',
       });
 

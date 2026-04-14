@@ -275,7 +275,7 @@ export default function EmployeeCalendarPage() {
     setMessage('');
 
     try {
-      const response = await fetch(`/api/bookings/${bookingId}`, {
+      const response = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, {
         method: 'DELETE',
       });
 

@@ -85,7 +85,7 @@ export default function AccountPage() {
 
   const requestChange = async (bookingId: string, requestType: string) => {
     setMessage('');
-    const response = await fetch(`/api/bookings/${bookingId}`, {
+    const response = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customer_update_request: requestType }),
