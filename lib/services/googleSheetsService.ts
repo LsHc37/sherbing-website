@@ -123,6 +123,18 @@ function columnNumberToName(columnNumber: number) {
   return name;
 }
 
+function normalizeHeaderValue(value: string) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function findHeaderIndexes(headers: string[], aliases: string[]) {
+  const normalizedAliases = aliases.map(normalizeHeaderValue);
+  return headers
+    .map((header, index) => ({ normalized: normalizeHeaderValue(header), index }))
+    .filter(({ normalized }) => normalizedAliases.includes(normalized))
+    .map(({ index }) => index);
+}
+
 async function ensureHeaders(tabName: string, headers: string[]) {
   const client = await getSheetsClient();
   if (!client) return { success: true as const, skipped: true as const };
@@ -828,9 +840,7 @@ export async function updateBookingInSheet(
   if (rows.length < 2) return { success: false, error: 'No bookings found' };
 
   const headers = rows[0];
-  const bookingIdHeaderIndexCandidates = ['Booking ID', 'booking_id', 'BookingId', 'ID']
-    .map((name) => headers.indexOf(name))
-    .filter((index) => index >= 0);
+  const bookingIdHeaderIndexCandidates = findHeaderIndexes(headers, ['Booking ID', 'booking_id', 'BookingId', 'ID']);
 
   if (bookingIdHeaderIndexCandidates.length === 0) {
     return { success: false, error: 'Booking ID column not found' };
@@ -889,9 +899,7 @@ export async function deleteBookingFromSheet(bookingId: string) {
   if (rows.length < 2) return { success: false as const, error: 'No bookings found' };
 
   const headers = rows[0];
-  const bookingIdHeaderIndexCandidates = ['Booking ID', 'booking_id', 'BookingId', 'ID']
-    .map((name) => headers.indexOf(name))
-    .filter((index) => index >= 0);
+  const bookingIdHeaderIndexCandidates = findHeaderIndexes(headers, ['Booking ID', 'booking_id', 'BookingId', 'ID']);
 
   if (bookingIdHeaderIndexCandidates.length === 0) {
     return { success: false as const, error: 'Booking ID column not found' };
