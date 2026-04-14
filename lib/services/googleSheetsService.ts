@@ -135,6 +135,42 @@ function findHeaderIndexes(headers: string[], aliases: string[]) {
     .map(({ index }) => index);
 }
 
+function normalizeCellValue(value: string) {
+  return normalizeBookingIdentifier(String(value || ''))
+    .replace(/^'+|'+$/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+function resolveBookingRowIndex(rows: string[][], bookingId: string, bookingIdHeaderIndexCandidates: number[]) {
+  let bookingIndex = -1;
+  const targetBookingId = normalizeBookingIdentifier(bookingId);
+
+  const syntheticMatch = /^ROW-(\d+)$/i.exec(targetBookingId);
+  if (syntheticMatch) {
+    const requestedRowNumber = Number(syntheticMatch[1]);
+    if (Number.isFinite(requestedRowNumber) && requestedRowNumber >= 2 && requestedRowNumber <= rows.length) {
+      bookingIndex = requestedRowNumber - 1;
+    }
+  }
+
+  if (bookingIndex === -1) {
+    bookingIndex = rows.findIndex((r, i) =>
+      i > 0 && bookingIdHeaderIndexCandidates.some((columnIndex) => bookingIdsMatch(String(r[columnIndex] || ''), targetBookingId))
+    );
+  }
+
+  if (bookingIndex === -1) {
+    const targetNormalized = normalizeCellValue(targetBookingId);
+    bookingIndex = rows.findIndex((r, i) => {
+      if (i <= 0) return false;
+      return r.some((cell) => normalizeCellValue(String(cell || '')) === targetNormalized);
+    });
+  }
+
+  return bookingIndex;
+}
+
 async function ensureHeaders(tabName: string, headers: string[]) {
   const client = await getSheetsClient();
   if (!client) return { success: true as const, skipped: true as const };
@@ -831,7 +867,6 @@ export async function updateBookingInSheet(
   bookingId: string,
   updates: Partial<Pick<BookingSheetRow, 'status' | 'assigned_employee' | 'customer_update_request' | 'notes' | 'scheduled_date' | 'scheduled_time'>>
 ) {
-  const targetBookingId = normalizeBookingIdentifier(bookingId);
   const client = await getSheetsClient();
   if (!client) return { success: false, error: 'Google Sheets not configured' };
 
@@ -846,20 +881,7 @@ export async function updateBookingInSheet(
     return { success: false, error: 'Booking ID column not found' };
   }
 
-  let bookingIndex = -1;
-  const syntheticMatch = /^ROW-(\d+)$/i.exec(targetBookingId);
-  if (syntheticMatch) {
-    const requestedRowNumber = Number(syntheticMatch[1]);
-    if (Number.isFinite(requestedRowNumber) && requestedRowNumber >= 2 && requestedRowNumber <= rows.length) {
-      bookingIndex = requestedRowNumber - 1;
-    }
-  }
-
-  if (bookingIndex === -1) {
-    bookingIndex = rows.findIndex((r, i) =>
-      i > 0 && bookingIdHeaderIndexCandidates.some((columnIndex) => bookingIdsMatch(String(r[columnIndex] || ''), targetBookingId))
-    );
-  }
+  const bookingIndex = resolveBookingRowIndex(rows, bookingId, bookingIdHeaderIndexCandidates);
   if (bookingIndex === -1) return { success: false, error: 'Booking not found' };
 
   const row = rows[bookingIndex];
@@ -890,7 +912,6 @@ export async function updateBookingInSheet(
 }
 
 export async function deleteBookingFromSheet(bookingId: string) {
-  const targetBookingId = normalizeBookingIdentifier(bookingId);
   const client = await getSheetsClient();
   if (!client) return { success: false as const, error: 'Google Sheets not configured' };
 
@@ -905,20 +926,7 @@ export async function deleteBookingFromSheet(bookingId: string) {
     return { success: false as const, error: 'Booking ID column not found' };
   }
 
-  let bookingIndex = -1;
-  const syntheticMatch = /^ROW-(\d+)$/i.exec(targetBookingId);
-  if (syntheticMatch) {
-    const requestedRowNumber = Number(syntheticMatch[1]);
-    if (Number.isFinite(requestedRowNumber) && requestedRowNumber >= 2 && requestedRowNumber <= rows.length) {
-      bookingIndex = requestedRowNumber - 1;
-    }
-  }
-
-  if (bookingIndex === -1) {
-    bookingIndex = rows.findIndex((r, i) =>
-      i > 0 && bookingIdHeaderIndexCandidates.some((columnIndex) => bookingIdsMatch(String(r[columnIndex] || ''), targetBookingId))
-    );
-  }
+  const bookingIndex = resolveBookingRowIndex(rows, bookingId, bookingIdHeaderIndexCandidates);
 
   if (bookingIndex <= 0) return { success: false as const, error: 'Booking not found' };
 
