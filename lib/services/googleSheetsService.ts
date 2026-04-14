@@ -787,7 +787,16 @@ export async function listBookingsByCustomerEmail(email: string) {
 
 export async function findBookingById(bookingId: string) {
   const all = await listBookingsFromSheet();
-  return all.find((b) => b.booking_id === bookingId);
+  const directMatch = all.find((b) => b.booking_id === bookingId);
+  if (directMatch) return directMatch;
+
+  const syntheticMatch = /^ROW-(\d+)$/i.exec(bookingId);
+  if (!syntheticMatch) return undefined;
+
+  const rowNumber = Number(syntheticMatch[1]);
+  if (!Number.isFinite(rowNumber)) return undefined;
+
+  return all.find((b) => b.row_index === rowNumber);
 }
 
 export async function updateBookingInSheet(
