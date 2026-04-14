@@ -3,6 +3,14 @@ import { deleteBookingFromSheet, findBookingById, updateBookingInSheet } from '@
 import { isBookingSlotAvailable } from '@/lib/services/googleSheetsService';
 import { NextRequest, NextResponse } from 'next/server';
 
+function normalizeBookingIdParam(rawBookingId: string) {
+  try {
+    return decodeURIComponent(String(rawBookingId || '').trim());
+  } catch {
+    return String(rawBookingId || '').trim();
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ bookingId: string }> }
@@ -14,12 +22,13 @@ export async function PATCH(
     }
 
     const { bookingId } = await context.params;
+    const normalizedBookingId = normalizeBookingIdParam(bookingId);
     const body = await request.json();
 
     if (session.role === 'customer') {
-      const booking = await findBookingById(bookingId);
+      const booking = await findBookingById(normalizedBookingId);
       if (!booking) {
-        return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Booking not found', booking_id: normalizedBookingId }, { status: 404 });
       }
       if (booking.customer_email.toLowerCase() !== session.email.toLowerCase()) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -31,7 +40,7 @@ export async function PATCH(
         return NextResponse.json({ error: 'Update request is required' }, { status: 400 });
       }
 
-      const result = await updateBookingInSheet(bookingId, {
+      const result = await updateBookingInSheet(normalizedBookingId, {
         customer_update_request: updateRequest,
         notes,
         status: 'change_requested',
@@ -45,9 +54,9 @@ export async function PATCH(
     }
 
     if (session.role === 'employee' || session.role === 'admin') {
-      const booking = await findBookingById(bookingId);
+      const booking = await findBookingById(normalizedBookingId);
       if (!booking) {
-        return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Booking not found', booking_id: normalizedBookingId }, { status: 404 });
       }
 
       const status = body.status ? String(body.status) : undefined;
@@ -68,7 +77,7 @@ export async function PATCH(
       }
 
       if (scheduledDate && scheduledTime) {
-        const isAvailable = await isBookingSlotAvailable(scheduledDate, scheduledTime, bookingId);
+        const isAvailable = await isBookingSlotAvailable(scheduledDate, scheduledTime, normalizedBookingId);
         if (!isAvailable) {
           return NextResponse.json({ error: 'Selected date/time is already booked' }, { status: 409 });
         }
@@ -81,7 +90,7 @@ export async function PATCH(
           ? session.email
           : booking.assigned_employee || undefined;
 
-      const result = await updateBookingInSheet(bookingId, {
+      const result = await updateBookingInSheet(normalizedBookingId, {
         status,
         notes,
         assigned_employee: resolvedAssignedEmployee,
@@ -118,9 +127,10 @@ export async function DELETE(
     }
 
     const { bookingId } = await context.params;
-    const booking = await findBookingById(bookingId);
+    const normalizedBookingId = normalizeBookingIdParam(bookingId);
+    const booking = await findBookingById(normalizedBookingId);
     if (!booking) {
-      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Booking not found', booking_id: normalizedBookingId }, { status: 404 });
     }
 
     if (session.role === 'employee') {
@@ -130,7 +140,7 @@ export async function DELETE(
       }
     }
 
-    const result = await deleteBookingFromSheet(bookingId);
+    const result = await deleteBookingFromSheet(normalizedBookingId);
     if (!result.success) {
       return NextResponse.json({ error: result.error || 'Failed to delete booking' }, { status: 400 });
     }

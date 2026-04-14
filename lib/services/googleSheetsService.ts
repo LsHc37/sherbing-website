@@ -785,12 +785,28 @@ export async function listBookingsByCustomerEmail(email: string) {
   return all.filter((b) => b.customer_email.toLowerCase() === target);
 }
 
+function normalizeBookingIdentifier(value: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    return decodeURIComponent(raw).trim();
+  } catch {
+    return raw;
+  }
+}
+
+function bookingIdsMatch(left: string, right: string) {
+  return normalizeBookingIdentifier(left).toLowerCase() === normalizeBookingIdentifier(right).toLowerCase();
+}
+
 export async function findBookingById(bookingId: string) {
+  const targetBookingId = normalizeBookingIdentifier(bookingId);
   const all = await listBookingsFromSheet();
-  const directMatch = all.find((b) => b.booking_id === bookingId);
+  const directMatch = all.find((b) => bookingIdsMatch(b.booking_id, targetBookingId));
   if (directMatch) return directMatch;
 
-  const syntheticMatch = /^ROW-(\d+)$/i.exec(bookingId);
+  const syntheticMatch = /^ROW-(\d+)$/i.exec(targetBookingId);
   if (!syntheticMatch) return undefined;
 
   const rowNumber = Number(syntheticMatch[1]);
@@ -803,6 +819,7 @@ export async function updateBookingInSheet(
   bookingId: string,
   updates: Partial<Pick<BookingSheetRow, 'status' | 'assigned_employee' | 'customer_update_request' | 'notes' | 'scheduled_date' | 'scheduled_time'>>
 ) {
+  const targetBookingId = normalizeBookingIdentifier(bookingId);
   const client = await getSheetsClient();
   if (!client) return { success: false, error: 'Google Sheets not configured' };
 
@@ -820,7 +837,7 @@ export async function updateBookingInSheet(
   }
 
   let bookingIndex = -1;
-  const syntheticMatch = /^ROW-(\d+)$/i.exec(bookingId);
+  const syntheticMatch = /^ROW-(\d+)$/i.exec(targetBookingId);
   if (syntheticMatch) {
     const requestedRowNumber = Number(syntheticMatch[1]);
     if (Number.isFinite(requestedRowNumber) && requestedRowNumber >= 2 && requestedRowNumber <= rows.length) {
@@ -830,7 +847,7 @@ export async function updateBookingInSheet(
 
   if (bookingIndex === -1) {
     bookingIndex = rows.findIndex((r, i) =>
-      i > 0 && bookingIdHeaderIndexCandidates.some((columnIndex) => (r[columnIndex] || '') === bookingId)
+      i > 0 && bookingIdHeaderIndexCandidates.some((columnIndex) => bookingIdsMatch(String(r[columnIndex] || ''), targetBookingId))
     );
   }
   if (bookingIndex === -1) return { success: false, error: 'Booking not found' };
@@ -863,6 +880,7 @@ export async function updateBookingInSheet(
 }
 
 export async function deleteBookingFromSheet(bookingId: string) {
+  const targetBookingId = normalizeBookingIdentifier(bookingId);
   const client = await getSheetsClient();
   if (!client) return { success: false as const, error: 'Google Sheets not configured' };
 
@@ -880,7 +898,7 @@ export async function deleteBookingFromSheet(bookingId: string) {
   }
 
   let bookingIndex = -1;
-  const syntheticMatch = /^ROW-(\d+)$/i.exec(bookingId);
+  const syntheticMatch = /^ROW-(\d+)$/i.exec(targetBookingId);
   if (syntheticMatch) {
     const requestedRowNumber = Number(syntheticMatch[1]);
     if (Number.isFinite(requestedRowNumber) && requestedRowNumber >= 2 && requestedRowNumber <= rows.length) {
@@ -890,7 +908,7 @@ export async function deleteBookingFromSheet(bookingId: string) {
 
   if (bookingIndex === -1) {
     bookingIndex = rows.findIndex((r, i) =>
-      i > 0 && bookingIdHeaderIndexCandidates.some((columnIndex) => (r[columnIndex] || '') === bookingId)
+      i > 0 && bookingIdHeaderIndexCandidates.some((columnIndex) => bookingIdsMatch(String(r[columnIndex] || ''), targetBookingId))
     );
   }
 
