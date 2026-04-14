@@ -1,5 +1,5 @@
 import { getSessionFromRequest } from '@/lib/auth/session';
-import { findBookingById, updateBookingInSheet } from '@/lib/services/googleSheetsService';
+import { deleteBookingFromSheet, findBookingById, updateBookingInSheet } from '@/lib/services/googleSheetsService';
 import { isBookingSlotAvailable } from '@/lib/services/googleSheetsService';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -100,5 +100,43 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to update booking', details: (error as Error).message }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ bookingId: string }> }
+) {
+  try {
+    const session = getSessionFromRequest(request);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (session.role !== 'employee' && session.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { bookingId } = await context.params;
+    const booking = await findBookingById(bookingId);
+    if (!booking) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+
+    if (session.role === 'employee') {
+      const assignedEmployee = String(booking.assigned_employee || '').trim().toLowerCase();
+      if (assignedEmployee !== session.email.toLowerCase()) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    const result = await deleteBookingFromSheet(bookingId);
+    if (!result.success) {
+      return NextResponse.json({ error: result.error || 'Failed to delete booking' }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to delete booking', details: (error as Error).message }, { status: 500 });
   }
 }

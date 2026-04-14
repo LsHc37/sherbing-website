@@ -89,6 +89,7 @@ export default function EmployeeCalendarPage() {
   const [loading, setLoading] = useState(true);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
@@ -263,6 +264,34 @@ export default function EmployeeCalendarPage() {
 
   const saveEntries = async () => {
     await persistEntries(entries);
+  };
+
+  const deleteBooking = async (bookingId: string) => {
+    const confirmed = window.confirm('Delete this booking permanently?');
+    if (!confirmed) return;
+
+    setActionLoading(bookingId + 'delete');
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'DELETE',
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body?.error || 'Failed to delete booking');
+      }
+
+      setMessage('Booking deleted successfully.');
+      await loadData();
+      await loadDateSlots(selectedDate);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete booking');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const logout = async () => {
@@ -463,6 +492,13 @@ export default function EmployeeCalendarPage() {
                             <p className="text-xs text-gray-600">Phone: {booking.customer_phone || 'N/A'}</p>
                             <p className="text-xs text-gray-600">Email: {booking.customer_email || 'N/A'}</p>
                             <p className="text-xs text-gray-600">Address: {formatAddress(booking) || 'N/A'}</p>
+                            <button
+                              onClick={() => void deleteBooking(booking.id)}
+                              disabled={actionLoading === booking.id + 'delete'}
+                              className="mt-2 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+                            >
+                              {actionLoading === booking.id + 'delete' ? 'Deleting...' : 'Delete Booking'}
+                            </button>
                           </div>
                         ))}
                       </div>

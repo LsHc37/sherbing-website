@@ -853,6 +853,70 @@ export async function updateBookingInSheet(
   return { success: true };
 }
 
+export async function deleteBookingFromSheet(bookingId: string) {
+  const client = await getSheetsClient();
+  if (!client) return { success: false as const, error: 'Google Sheets not configured' };
+
+  const { sheets, spreadsheetId } = client;
+  const rows = await getTabRows(bookingsTabName());
+  if (rows.length < 2) return { success: false as const, error: 'No bookings found' };
+
+  const headers = rows[0];
+  const bookingIdHeaderIndexCandidates = ['Booking ID', 'booking_id', 'BookingId', 'ID']
+    .map((name) => headers.indexOf(name))
+    .filter((index) => index >= 0);
+
+  if (bookingIdHeaderIndexCandidates.length === 0) {
+    return { success: false as const, error: 'Booking ID column not found' };
+  }
+
+  let bookingIndex = -1;
+  const syntheticMatch = /^ROW-(\d+)$/i.exec(bookingId);
+  if (syntheticMatch) {
+    const requestedRowNumber = Number(syntheticMatch[1]);
+    if (Number.isFinite(requestedRowNumber) && requestedRowNumber >= 2 && requestedRowNumber <= rows.length) {
+      bookingIndex = requestedRowNumber - 1;
+    }
+  }
+
+  if (bookingIndex === -1) {
+    bookingIndex = rows.findIndex((r, i) =>
+      i > 0 && bookingIdHeaderIndexCandidates.some((columnIndex) => (r[columnIndex] || '') === bookingId)
+    );
+  }
+
+  if (bookingIndex <= 0) return { success: false as const, error: 'Booking not found' };
+
+  const spreadsheet = await withRetry(() => sheets.spreadsheets.get({ spreadsheetId }));
+  const bookingSheet = (spreadsheet.data.sheets || []).find(
+    (sheet) => sheet.properties?.title === bookingsTabName()
+  );
+  const sheetId = bookingSheet?.properties?.sheetId;
+  if (typeof sheetId !== 'number') {
+    return { success: false as const, error: 'Bookings sheet not found' };
+  }
+
+  await withRetry(() => sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId,
+              dimension: 'ROWS',
+              startIndex: bookingIndex,
+              endIndex: bookingIndex + 1,
+            },
+          },
+        },
+      ],
+    },
+  }));
+
+  return { success: true as const };
+}
+
 export async function findUserByEmail(email: string) {
   const users = await listUsersFromSheet();
   return users.find((u) => u.email === email.toLowerCase());

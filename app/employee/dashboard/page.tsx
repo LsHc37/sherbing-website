@@ -103,9 +103,10 @@ type BookingCardProps = {
   booking: Booking;
   actionLoading: string | null;
   onUpdateSchedule: (bookingId: string, scheduledDate: string, scheduledTime: string) => Promise<void>;
+  onDeleteBooking: (bookingId: string) => Promise<void>;
 };
 
-function BookingCard({ booking, actionLoading, onUpdateSchedule }: BookingCardProps) {
+function BookingCard({ booking, actionLoading, onUpdateSchedule, onDeleteBooking }: BookingCardProps) {
   const services = parseServices(booking.service_id);
   const [scheduledDateDraft, setScheduledDateDraft] = useState(booking.scheduled_date || '');
   const [scheduledTimeDraft, setScheduledTimeDraft] = useState(booking.scheduled_time || '');
@@ -164,6 +165,16 @@ function BookingCard({ booking, actionLoading, onUpdateSchedule }: BookingCardPr
               className="px-3 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-50"
             >
               {actionLoading === booking.id + 'schedule' ? 'Saving...' : 'Save Schedule'}
+            </button>
+          </div>
+
+          <div>
+            <button
+              onClick={() => void onDeleteBooking(booking.id)}
+              disabled={actionLoading === booking.id + 'delete'}
+              className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded-md hover:bg-red-200 disabled:opacity-50"
+            >
+              {actionLoading === booking.id + 'delete' ? 'Deleting...' : 'Delete Booking'}
             </button>
           </div>
 
@@ -311,6 +322,42 @@ export default function EmployeeDashboardPage() {
     }
   };
 
+  const deleteBooking = async (bookingId: string): Promise<void> => {
+    const confirmed = window.confirm('Delete this booking permanently?');
+    if (!confirmed) return;
+
+    setActionLoading(bookingId + 'delete');
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'DELETE',
+      });
+
+      const raw = await response.text();
+      let body: { error?: string } = {};
+      if (raw) {
+        try {
+          body = JSON.parse(raw) as { error?: string };
+        } catch {
+          body = {};
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(body?.error || 'Failed to delete booking');
+      }
+
+      setMessage('Booking deleted successfully.');
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete booking');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/';
@@ -415,6 +462,7 @@ export default function EmployeeDashboardPage() {
                   booking={booking}
                   actionLoading={actionLoading}
                   onUpdateSchedule={updateSchedule}
+                  onDeleteBooking={deleteBooking}
                 />
               ))}
             </div>
