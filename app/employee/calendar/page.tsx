@@ -93,6 +93,18 @@ function formatAddress(booking: Booking): string {
     .trim();
 }
 
+function normalizeTimeToMinutes(value: string): number {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return NaN;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function formatMinutesToTime(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
 function recurrenceLabel(entry: AvailabilityEntry): string {
   const repeat = entry.repeat || 'none';
   if (repeat === 'daily') return `Daily${entry.until ? ` until ${entry.until}` : ''}`;
@@ -405,6 +417,25 @@ export default function EmployeeCalendarPage() {
     return map;
   }, [bookings, selectedDate]);
 
+  const dayTimelineBookings = useMemo(() => {
+    return bookings
+      .filter((booking) => booking.scheduled_date === selectedDate && booking.scheduled_time)
+      .map((booking) => {
+        const startMinutes = normalizeTimeToMinutes(String(booking.scheduled_time || ''));
+        const durationMinutes = Number(booking.scheduled_duration_minutes || 60);
+        const safeDuration = Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes : 60;
+        const endMinutes = Number.isFinite(startMinutes) ? startMinutes + safeDuration : NaN;
+        return {
+          booking,
+          startMinutes,
+          endMinutes,
+          durationMinutes: safeDuration,
+        };
+      })
+      .filter((item) => Number.isFinite(item.startMinutes))
+      .sort((a, b) => a.startMinutes - b.startMinutes);
+  }, [bookings, selectedDate]);
+
   const openSlotCount = useMemo(() => slots.filter((slot) => slot.status === 'open').length, [slots]);
   const takenSlotCount = useMemo(() => slots.filter((slot) => slot.status === 'booked').length, [slots]);
 
@@ -656,6 +687,28 @@ export default function EmployeeCalendarPage() {
           <p className="text-sm text-gray-600">
             This view shows exactly what customers see as open/booked, plus customer details for booked times.
           </p>
+
+          {dayTimelineBookings.length > 0 && (
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-4">
+              <p className="text-sm font-semibold text-indigo-900 mb-3">Booked Jobs Timeline</p>
+              <div className="space-y-2">
+                {dayTimelineBookings.map(({ booking, startMinutes, endMinutes, durationMinutes }) => (
+                  <div key={`${booking.id}-timeline`} className="rounded-md border border-indigo-100 bg-white p-2">
+                    <div className="flex items-center justify-between text-xs text-indigo-900">
+                      <p className="font-medium truncate pr-3">{booking.customer_name || 'Customer'} • {prettyService(booking.service_id) || 'Service'}</p>
+                      <p>{formatMinutesToTime(startMinutes)} - {formatMinutesToTime(endMinutes)} ({durationMinutes}m)</p>
+                    </div>
+                    <div className="mt-2 h-2 rounded bg-indigo-100 overflow-hidden">
+                      <div
+                        className="h-full bg-indigo-500"
+                        style={{ width: `${Math.max(8, Math.min(100, (durationMinutes / 600) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
