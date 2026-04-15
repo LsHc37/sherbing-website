@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import type { JWTInput } from 'google-auth-library';
 import type { BookingForm } from '@/lib/types';
 import type { JobApplication, JobApplicationStatus } from '@/lib/types';
+import type { JobApplicationMessage } from '@/lib/types';
 import { calculatePayoutBreakdown } from '@/lib/services/payoutService';
 
 type BookingSheetRow = {
@@ -48,6 +49,7 @@ type UserSheetRow = {
   password_reset_token?: string;
   password_reset_expires?: string;
   available_dates?: string;
+  managed_groups?: string;
 };
 
 type JobApplicationSheetRow = {
@@ -70,6 +72,11 @@ type JobApplicationSheetRow = {
   resume_url: string;
   resume_mime_type: string;
   status: JobApplicationStatus;
+  interview_group?: string;
+  interview_scheduled_at?: string;
+  interview_meeting_url?: string;
+  onboarding_notes?: string;
+  interview_messages?: string;
   reviewed_by?: string;
   reviewed_at?: string;
 };
@@ -310,6 +317,7 @@ export async function initializeSheet() {
     'Password Reset Token',
     'Password Reset Expires',
     'Available Dates',
+    'Managed Groups',
   ];
 
   const jobApplicationHeaders = [
@@ -332,6 +340,11 @@ export async function initializeSheet() {
     'Resume URL',
     'Resume Mime Type',
     'Status',
+    'Interview Group',
+    'Interview Scheduled At',
+    'Interview Meeting URL',
+    'Onboarding Notes',
+    'Interview Messages',
     'Reviewed By',
     'Reviewed At',
   ];
@@ -519,6 +532,7 @@ function parseUserRows(rows: string[][]): UserSheetRow[] {
     password_reset_token: get(row, 'Password Reset Token').trim(),
     password_reset_expires: get(row, 'Password Reset Expires').trim(),
     available_dates: get(row, 'Available Dates').trim(),
+    managed_groups: get(row, 'Managed Groups').trim(),
   }));
 }
 
@@ -533,6 +547,30 @@ function parseJobApplicationRows(rows: string[][]): JobApplication[] {
     return value === undefined || value === null ? '' : String(value);
   };
   const normalizeSelection = (value: string) => String(value || '').trim().toLowerCase();
+  const parseMessages = (value: string): JobApplicationMessage[] => {
+    const raw = String(value || '').trim();
+    if (!raw) return [];
+
+    try {
+      const parsed = JSON.parse(raw) as JobApplicationMessage[];
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .map((message) => {
+          const senderRole: JobApplicationMessage['sender_role'] = message.sender_role === 'admin' ? 'admin' : 'employee';
+          return {
+            id: String(message.id || '').trim(),
+            sender_email: String(message.sender_email || '').trim().toLowerCase(),
+            sender_name: String(message.sender_name || '').trim(),
+            sender_role: senderRole,
+            created_at: String(message.created_at || '').trim(),
+            body: String(message.body || '').trim(),
+          };
+        })
+        .filter((message) => message.id && message.sender_email && message.sender_name && message.body);
+    } catch {
+      return [];
+    }
+  };
 
   return rows.slice(1).map((row, rowOffset) => {
     const rawEquipment = get(row, 'Equipment Known');
@@ -561,7 +599,12 @@ function parseJobApplicationRows(rows: string[][]): JobApplication[] {
       resume_file_name: get(row, 'Resume File Name').trim(),
       resume_url: get(row, 'Resume URL').trim(),
       resume_mime_type: get(row, 'Resume Mime Type').trim(),
-      status: ['new', 'reviewing', 'interview', 'hired', 'rejected'].includes(status) ? status : 'new',
+      status: ['new', 'reviewing', 'interview', 'onboarding', 'hired', 'rejected'].includes(status) ? status : 'new',
+      interview_group: get(row, 'Interview Group').trim(),
+      interview_scheduled_at: get(row, 'Interview Scheduled At').trim(),
+      interview_meeting_url: get(row, 'Interview Meeting URL').trim(),
+      onboarding_notes: get(row, 'Onboarding Notes').trim(),
+      messages: parseMessages(get(row, 'Interview Messages')),
       reviewed_by: get(row, 'Reviewed By').trim(),
       reviewed_at: get(row, 'Reviewed At').trim(),
     };
@@ -1216,7 +1259,7 @@ export async function findUserByEmail(email: string) {
 
 export async function updateUserInSheet(
   email: string,
-  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires' | 'password_reset_token' | 'password_reset_expires' | 'available_dates'>> & { email_verified?: string | boolean }
+  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires' | 'password_reset_token' | 'password_reset_expires' | 'available_dates' | 'managed_groups'>> & { email_verified?: string | boolean }
 ) {
   const client = await getSheetsClient();
   if (!client) return { success: false, error: 'Google Sheets not configured' };
@@ -1250,6 +1293,7 @@ export async function updateUserInSheet(
   set('Password Reset Token', updates.password_reset_token);
   set('Password Reset Expires', updates.password_reset_expires);
   set('Available Dates', updates.available_dates);
+  set('Managed Groups', updates.managed_groups);
 
   const endColumn = columnNumberToName(headers.length);
   const range = `${usersTabName()}!A${rowIndex + 1}:${endColumn}${rowIndex + 1}`;
@@ -1305,6 +1349,7 @@ export async function createUserInSheet(user: {
         '', // Password Reset Token
         '', // Password Reset Expires
         '', // Available Dates
+        '', // Managed Groups
       ]],
     },
   }));
@@ -1331,6 +1376,7 @@ export async function addJobApplicationToSheet(application: {
   resume_url: string;
   resume_mime_type: string;
   status?: JobApplicationStatus;
+  interview_group?: string;
 }) {
   const init = await initializeSheet();
   if (!init.success) return init;
@@ -1364,6 +1410,11 @@ export async function addJobApplicationToSheet(application: {
         application.resume_url,
         application.resume_mime_type,
         application.status || 'new',
+        application.interview_group || '',
+        '',
+        '',
+        '',
+        '[]',
         '',
         '',
       ]],
@@ -1375,7 +1426,7 @@ export async function addJobApplicationToSheet(application: {
 
 export async function updateJobApplicationInSheet(
   applicationId: string,
-  updates: Partial<Pick<JobApplicationSheetRow, 'status' | 'reviewed_by' | 'reviewed_at'>>
+  updates: Partial<Pick<JobApplicationSheetRow, 'status' | 'interview_group' | 'interview_scheduled_at' | 'interview_meeting_url' | 'onboarding_notes' | 'interview_messages' | 'reviewed_by' | 'reviewed_at'>>
 ) {
   const client = await getSheetsClient();
   if (!client) return { success: false, error: 'Google Sheets not configured' };
@@ -1386,7 +1437,8 @@ export async function updateJobApplicationInSheet(
 
   const headers = rows[0];
   const idIdx = headers.indexOf('Application ID');
-  const rowIndex = rows.findIndex((r, i) => i > 0 && String(r[idIdx] || '').trim() === applicationId);
+  const targetApplicationId = normalizeJobApplicationIdentifier(applicationId);
+  const rowIndex = rows.findIndex((r, i) => i > 0 && jobApplicationIdsMatch(String(r[idIdx] || ''), targetApplicationId));
   if (rowIndex === -1) return { success: false, error: 'Job application not found' };
 
   const row = rows[rowIndex];
@@ -1397,6 +1449,11 @@ export async function updateJobApplicationInSheet(
   };
 
   set('Status', updates.status);
+  set('Interview Group', updates.interview_group);
+  set('Interview Scheduled At', updates.interview_scheduled_at);
+  set('Interview Meeting URL', updates.interview_meeting_url);
+  set('Onboarding Notes', updates.onboarding_notes);
+  set('Interview Messages', updates.interview_messages);
   set('Reviewed By', updates.reviewed_by);
   set('Reviewed At', updates.reviewed_at);
 

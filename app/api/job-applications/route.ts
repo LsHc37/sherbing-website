@@ -6,11 +6,14 @@ import { getSessionFromRequest } from '@/lib/auth/session';
 import {
   addJobApplicationToSheet,
   deleteJobApplicationFromSheet,
+  findJobApplicationById,
+  findUserByEmail,
   listJobApplicationsFromSheet,
   updateJobApplicationInSheet,
 } from '@/lib/services/googleSheetsService';
 
-const ALLOWED_STATUSES = new Set(['new', 'reviewing', 'interview', 'hired', 'rejected']);
+const ALLOWED_STATUSES = new Set(['new', 'reviewing', 'interview', 'onboarding', 'hired', 'rejected']);
+const MAIN_ADMIN_EMAIL = String(process.env.MAIN_ADMIN_EMAIL || 'lucas.mellen1@gmail.com').trim().toLowerCase();
 const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
   'application/msword',
@@ -36,6 +39,15 @@ function normalizeFileName(name: string) {
 
 function statusLabel(status: string) {
   return ALLOWED_STATUSES.has(status) ? status : 'new';
+}
+
+function parseManagedGroups(value: string | undefined) {
+  return Array.from(new Set(
+    String(value || '')
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean)
+  ));
 }
 
 async function saveResumeFile(applicationId: string, resumeFile: File) {
@@ -184,20 +196,87 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = (await request.json()) as { application_id?: string; status?: string };
+    const body = (await request.json()) as {
+      application_id?: string;
+      status?: string;
+      interview_scheduled_at?: string;
+      interview_meeting_url?: string;
+      onboarding_notes?: string;
+      interview_group?: string;
+      message_text?: string;
+    };
     const applicationId = normalizeField(body.application_id || null);
     const status = statusLabel(String(body.status || '').toLowerCase());
+    const interviewScheduledAt = normalizeField(body.interview_scheduled_at || null);
+    const interviewMeetingUrl = normalizeField(body.interview_meeting_url || null);
+    const onboardingNotes = normalizeField(body.onboarding_notes || null);
+    const interviewGroup = normalizeField(body.interview_group || null).toLowerCase();
+    const messageText = normalizeField(body.message_text || null);
+    const hasInterviewUpdate = Boolean(interviewScheduledAt || interviewMeetingUrl || onboardingNotes || interviewGroup);
+    const isMainAdmin = session.role === 'admin' && session.email.trim().toLowerCase() === MAIN_ADMIN_EMAIL;
 
     if (!applicationId) {
       return NextResponse.json({ error: 'application_id is required' }, { status: 400 });
     }
-    if (!ALLOWED_STATUSES.has(status)) {
+    if (body.status && !ALLOWED_STATUSES.has(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    }
+    if (interviewMeetingUrl) {
+      try {
+        const parsed = new URL(interviewMeetingUrl);
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return NextResponse.json({ error: 'Interview meeting URL must use http or https' }, { status: 400 });
+        }
+      } catch {
+        return NextResponse.json({ error: 'Interview meeting URL is invalid' }, { status: 400 });
+      }
+    }
+    const application = await findJobApplicationById(applicationId);
+    if (!application) {
+      return NextResponse.json({ error: 'Job application not found' }, { status: 404 });
+    }
+
+    const sessionUser = await findUserByEmail(session.email);
+    const managedGroups = parseManagedGroups(sessionUser?.managed_groups);
+    const existingGroup = String(application.interview_group || '').trim().toLowerCase();
+    const targetGroup = interviewGroup || existingGroup;
+    const isAdmin = session.role === 'admin';
+    const isGroupManager = !isAdmin && Boolean(targetGroup) && managedGroups.includes(targetGroup);
+
+    if (hasInterviewUpdate && !isAdmin && !isGroupManager) {
+      return NextResponse.json({ error: 'Only admins or assigned group managers can manage interview call details' }, { status: 403 });
+    }
+
+    if (interviewGroup && !isAdmin) {
+      return NextResponse.json({ error: 'Only admins can assign interview groups' }, { status: 403 });
+    }
+
+    let nextMessages: string | undefined;
+    if (messageText) {
+      if (!isAdmin && !isGroupManager) {
+        return NextResponse.json({ error: 'Only admins or assigned group managers can send interview messages' }, { status: 403 });
+      }
+
+      const currentMessages = Array.isArray(application.messages) ? application.messages : [];
+      const nextMessage = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        sender_email: session.email.trim().toLowerCase(),
+        sender_name: session.full_name || session.email,
+        sender_role: session.role === 'admin' ? 'admin' : 'employee',
+        created_at: new Date().toISOString(),
+        body: messageText,
+      };
+      nextMessages = JSON.stringify([...currentMessages, nextMessage]);
     }
 
     const result = await updateJobApplicationInSheet(applicationId, {
-      status: status as 'new' | 'reviewing' | 'interview' | 'hired' | 'rejected',
-      reviewed_by: session.full_name,
+      status: body.status ? (status as 'new' | 'reviewing' | 'interview' | 'onboarding' | 'hired' | 'rejected') : undefined,
+      interview_group: interviewGroup || undefined,
+      interview_scheduled_at: interviewScheduledAt || undefined,
+      interview_meeting_url: interviewMeetingUrl || undefined,
+      onboarding_notes: onboardingNotes || undefined,
+      interview_messages: nextMessages,
+      reviewed_by: isMainAdmin ? `${session.full_name || session.email} (Primary Admin)` : (session.full_name || session.email),
       reviewed_at: new Date().toISOString(),
     });
 

@@ -23,6 +23,11 @@ export async function PATCH(
       : body.available_dates === undefined
         ? undefined
         : String(body.available_dates).trim();
+    const managedGroups = Array.isArray(body.managed_groups)
+      ? body.managed_groups.map((value: unknown) => String(value).trim().toLowerCase()).filter(Boolean).join(',')
+      : body.managed_groups === undefined
+        ? undefined
+        : String(body.managed_groups).trim().toLowerCase();
 
     if (role && !['customer', 'employee', 'admin'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
@@ -32,6 +37,7 @@ export async function PATCH(
       role: role as 'customer' | 'employee' | 'admin' | undefined,
       active,
       available_dates: availableDates,
+      managed_groups: managedGroups,
     });
 
     if (!result.success) {

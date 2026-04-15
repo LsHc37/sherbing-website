@@ -31,6 +31,7 @@ export interface User {
   full_name?: string;
   phone?: string;
   role: 'customer' | 'employee' | 'admin';
+  managed_groups?: string[];
   email_verified: boolean;
   email_verification_code?: string; // Temp code sent via email
   email_verification_expires?: string; // ISO timestamp, usually +10 min from now
@@ -111,7 +112,16 @@ export interface Review {
   created_at: string;
 }
 
-export type JobApplicationStatus = 'new' | 'reviewing' | 'interview' | 'hired' | 'rejected';
+export type JobApplicationStatus = 'new' | 'reviewing' | 'interview' | 'onboarding' | 'hired' | 'rejected';
+
+export interface JobApplicationMessage {
+  id: string;
+  sender_email: string;
+  sender_name: string;
+  sender_role: 'employee' | 'admin';
+  created_at: string;
+  body: string;
+}
 
 export interface JobApplication {
   id: string;
@@ -133,6 +143,11 @@ export interface JobApplication {
   resume_url: string;
   resume_mime_type: string;
   status: JobApplicationStatus;
+  interview_group?: string;
+  interview_scheduled_at?: string;
+  interview_meeting_url?: string;
+  onboarding_notes?: string;
+  messages?: JobApplicationMessage[];
   reviewed_by?: string;
   reviewed_at?: string;
 }

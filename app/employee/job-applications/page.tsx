@@ -8,6 +8,16 @@ type User = {
   email: string;
   full_name: string;
   role: 'employee' | 'admin' | 'customer';
+  managed_groups?: string;
+};
+
+type JobApplicationMessage = {
+  id: string;
+  sender_email: string;
+  sender_name: string;
+  sender_role: 'employee' | 'admin';
+  created_at: string;
+  body: string;
 };
 
 type JobApplication = {
@@ -29,12 +39,18 @@ type JobApplication = {
   resume_file_name: string;
   resume_url: string;
   resume_mime_type: string;
-  status: 'new' | 'reviewing' | 'interview' | 'hired' | 'rejected';
+  status: 'new' | 'reviewing' | 'interview' | 'onboarding' | 'hired' | 'rejected';
+  interview_group?: string;
+  interview_scheduled_at?: string;
+  interview_meeting_url?: string;
+  onboarding_notes?: string;
+  messages?: JobApplicationMessage[];
   reviewed_by?: string;
   reviewed_at?: string;
 };
 
-const statusOptions: JobApplication['status'][] = ['new', 'reviewing', 'interview', 'hired', 'rejected'];
+const statusOptions: JobApplication['status'][] = ['new', 'reviewing', 'interview', 'onboarding', 'hired', 'rejected'];
+const MAIN_ADMIN_EMAIL = 'lucas.mellen1@gmail.com';
 
 function formatDateTime(value: string) {
   if (!value) return 'Not provided';
@@ -49,6 +65,8 @@ function statusStyles(status: JobApplication['status']) {
       return 'bg-emerald-100 text-emerald-800 border-emerald-200';
     case 'interview':
       return 'bg-sky-100 text-sky-800 border-sky-200';
+    case 'onboarding':
+      return 'bg-violet-100 text-violet-800 border-violet-200';
     case 'reviewing':
       return 'bg-amber-100 text-amber-800 border-amber-200';
     case 'rejected':
@@ -56,6 +74,15 @@ function statusStyles(status: JobApplication['status']) {
     default:
       return 'bg-slate-100 text-slate-700 border-slate-200';
   }
+}
+
+function parseManagedGroups(value?: string) {
+  return Array.from(new Set(
+    String(value || '')
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean)
+  ));
 }
 
 export default function EmployeeJobApplicationsPage() {
@@ -67,6 +94,22 @@ export default function EmployeeJobApplicationsPage() {
   const [selectedStatus, setSelectedStatus] = useState<'all' | JobApplication['status']>('all');
   const [savingId, setSavingId] = useState('');
   const [deletingId, setDeletingId] = useState('');
+  const [interviewDateDrafts, setInterviewDateDrafts] = useState<Record<string, string>>({});
+  const [meetingUrlDrafts, setMeetingUrlDrafts] = useState<Record<string, string>>({});
+  const [onboardingNotesDrafts, setOnboardingNotesDrafts] = useState<Record<string, string>>({});
+  const [interviewGroupDrafts, setInterviewGroupDrafts] = useState<Record<string, string>>({});
+  const [messageDrafts, setMessageDrafts] = useState<Record<string, string>>({});
+
+  const isPrimaryAdmin = user?.role === 'admin' && user.email.trim().toLowerCase() === MAIN_ADMIN_EMAIL;
+  const isAdmin = user?.role === 'admin';
+  const managedGroups = useMemo(() => parseManagedGroups(user?.managed_groups), [user?.managed_groups]);
+  const roleLabel = useMemo(() => {
+    if (!user) return 'User';
+    if (user.role === 'admin') return 'Admin';
+    if (user.role === 'employee' && managedGroups.length > 0) return 'Manager';
+    if (user.role === 'employee') return 'Employee';
+    return 'Customer';
+  }, [managedGroups.length, user]);
 
   const load = async () => {
     setLoading(true);
@@ -97,8 +140,30 @@ export default function EmployeeJobApplicationsPage() {
     }
 
     const data = await response.json();
-    setApplications(Array.isArray(data) ? data : []);
+    const nextApplications = Array.isArray(data) ? data : [];
+    setApplications(nextApplications);
+
+    const dateDraftMap: Record<string, string> = {};
+    const linkDraftMap: Record<string, string> = {};
+    const noteDraftMap: Record<string, string> = {};
+    const groupDraftMap: Record<string, string> = {};
+    for (const application of nextApplications) {
+      dateDraftMap[application.id] = application.interview_scheduled_at || '';
+      linkDraftMap[application.id] = application.interview_meeting_url || '';
+      noteDraftMap[application.id] = application.onboarding_notes || '';
+      groupDraftMap[application.id] = application.interview_group || '';
+    }
+    setInterviewDateDrafts(dateDraftMap);
+    setMeetingUrlDrafts(linkDraftMap);
+    setOnboardingNotesDrafts(noteDraftMap);
+    setInterviewGroupDrafts(groupDraftMap);
     setLoading(false);
+  };
+
+  const canManageInterviewForApplication = (application: JobApplication) => {
+    if (isAdmin) return true;
+    const group = String(application.interview_group || '').trim().toLowerCase();
+    return Boolean(group) && managedGroups.includes(group);
   };
 
   useEffect(() => {
@@ -127,6 +192,7 @@ export default function EmployeeJobApplicationsPage() {
         new: 0,
         reviewing: 0,
         interview: 0,
+        onboarding: 0,
         hired: 0,
         rejected: 0,
       }
@@ -152,6 +218,72 @@ export default function EmployeeJobApplicationsPage() {
       }
 
       setMessage('Application status updated.');
+      await load();
+    } finally {
+      setSavingId('');
+    }
+  };
+
+  const saveInterviewDetails = async (applicationId: string) => {
+    setSavingId(`${applicationId}:interview`);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/job-applications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          application_id: applicationId,
+          interview_group: interviewGroupDrafts[applicationId] || '',
+          interview_scheduled_at: interviewDateDrafts[applicationId] || '',
+          interview_meeting_url: meetingUrlDrafts[applicationId] || '',
+          onboarding_notes: onboardingNotesDrafts[applicationId] || '',
+        }),
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(body?.error || 'Unable to save interview details');
+        return;
+      }
+
+      setMessage('Interview details updated.');
+      await load();
+    } finally {
+      setSavingId('');
+    }
+  };
+
+  const sendMessage = async (applicationId: string) => {
+    const text = String(messageDrafts[applicationId] || '').trim();
+    if (!text) {
+      setError('Type a message before sending.');
+      return;
+    }
+
+    setSavingId(`${applicationId}:message`);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/job-applications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          application_id: applicationId,
+          message_text: text,
+        }),
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(body?.error || 'Unable to send message');
+        return;
+      }
+
+      setMessageDrafts((prev) => ({ ...prev, [applicationId]: '' }));
+      setMessage('Message sent.');
       await load();
     } finally {
       setSavingId('');
@@ -228,6 +360,9 @@ export default function EmployeeJobApplicationsPage() {
           <div>
             <p className="text-sm text-gray-500">Signed In As</p>
             <p className="text-lg font-semibold text-gray-900">{user?.full_name || user?.email}</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Access: {roleLabel}{managedGroups.length > 0 ? ` (${managedGroups.join(', ')})` : ''}
+            </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Total Applications</p>
@@ -239,7 +374,7 @@ export default function EmployeeJobApplicationsPage() {
           </div>
           <div>
             <p className="text-sm text-gray-500">In Review</p>
-            <p className="text-2xl font-bold text-amber-600">{statusCounts.reviewing + statusCounts.interview}</p>
+            <p className="text-2xl font-bold text-amber-600">{statusCounts.reviewing + statusCounts.interview + statusCounts.onboarding}</p>
           </div>
         </div>
 
@@ -362,6 +497,116 @@ export default function EmployeeJobApplicationsPage() {
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-500">Availability</p>
                   <p className="mt-2 text-sm text-gray-700 leading-7">{application.general_availability || 'No response provided.'}</p>
+                </div>
+
+                <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+                  <p className="text-xs uppercase tracking-wide text-gray-500">Interview and onboarding</p>
+                  <input
+                    type="datetime-local"
+                    value={interviewDateDrafts[application.id] || ''}
+                    disabled={!canManageInterviewForApplication(application)}
+                    onChange={(event) => setInterviewDateDrafts((prev) => ({
+                      ...prev,
+                      [application.id]: event.target.value,
+                    }))}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-gray-100"
+                  />
+                  <input
+                    type="url"
+                    placeholder="Video call link (Google Meet, Zoom, Teams...)"
+                    value={meetingUrlDrafts[application.id] || ''}
+                    disabled={!canManageInterviewForApplication(application)}
+                    onChange={(event) => setMeetingUrlDrafts((prev) => ({
+                      ...prev,
+                      [application.id]: event.target.value,
+                    }))}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-gray-100"
+                  />
+                  <textarea
+                    placeholder="Onboarding notes, required docs, next steps..."
+                    value={onboardingNotesDrafts[application.id] || ''}
+                    disabled={!canManageInterviewForApplication(application)}
+                    onChange={(event) => setOnboardingNotesDrafts((prev) => ({
+                      ...prev,
+                      [application.id]: event.target.value,
+                    }))}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm min-h-24 disabled:cursor-not-allowed disabled:bg-gray-100"
+                  />
+                  <input
+                    type="text"
+                    value={interviewGroupDrafts[application.id] || ''}
+                    disabled={!isAdmin}
+                    onChange={(event) => setInterviewGroupDrafts((prev) => ({
+                      ...prev,
+                      [application.id]: event.target.value.toLowerCase(),
+                    }))}
+                    placeholder="Interview group, ex: north-team"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-gray-100"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={!canManageInterviewForApplication(application) || savingId === `${application.id}:interview`}
+                      onClick={() => void saveInterviewDetails(application.id)}
+                      className="rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingId === `${application.id}:interview` ? 'Saving...' : 'Save interview plan'}
+                    </button>
+                    {application.interview_meeting_url && (
+                      <a
+                        href={application.interview_meeting_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100"
+                      >
+                        Join video call
+                      </a>
+                    )}
+                  </div>
+                  {!canManageInterviewForApplication(application) && (
+                    <p className="text-xs text-gray-500">
+                      Interview controls require admin access or manager assignment to this application group.
+                    </p>
+                  )}
+                  {isPrimaryAdmin && (
+                    <p className="text-xs text-gray-500">
+                      Primary admin can control all interview groups and manager permissions.
+                    </p>
+                  )}
+                </div>
+
+                <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+                  <p className="text-xs uppercase tracking-wide text-gray-500">Internal interview messages</p>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {(application.messages || []).length === 0 ? (
+                      <p className="text-sm text-gray-500">No messages yet.</p>
+                    ) : (
+                      (application.messages || []).map((messageItem) => (
+                        <div key={messageItem.id} className="rounded-md border border-gray-200 bg-white p-3">
+                          <p className="text-xs font-semibold text-gray-600">
+                            {messageItem.sender_name} ({messageItem.sender_role}) at {formatDateTime(messageItem.created_at)}
+                          </p>
+                          <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">{messageItem.body}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <textarea
+                    value={messageDrafts[application.id] || ''}
+                    onChange={(event) => setMessageDrafts((prev) => ({ ...prev, [application.id]: event.target.value }))}
+                    placeholder="Send a message to admins and employees handling this interview"
+                    disabled={!canManageInterviewForApplication(application)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm min-h-20 disabled:cursor-not-allowed disabled:bg-gray-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void sendMessage(application.id)}
+                    disabled={!canManageInterviewForApplication(application) || savingId === `${application.id}:message`}
+                    className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingId === `${application.id}:message` ? 'Sending...' : 'Send message'}
+                  </button>
                 </div>
               </article>
             ))

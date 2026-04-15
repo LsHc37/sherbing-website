@@ -11,6 +11,7 @@ type User = {
   role: 'customer' | 'employee' | 'admin';
   active: string;
   available_dates?: string;
+  managed_groups?: string;
 };
 
 export default function AdminUsersPage() {
@@ -19,6 +20,7 @@ export default function AdminUsersPage() {
   const [message, setMessage] = useState('');
   const [availabilityDrafts, setAvailabilityDrafts] = useState<Record<string, string[]>>({});
   const [availabilityInputs, setAvailabilityInputs] = useState<Record<string, string>>({});
+  const [managedGroupDrafts, setManagedGroupDrafts] = useState<Record<string, string>>({});
   const [inviteData, setInviteData] = useState({
     full_name: '',
     email: '',
@@ -29,6 +31,22 @@ export default function AdminUsersPage() {
   const parseAvailabilityDates = (value?: string) => {
     if (!value) return [] as string[];
     return Array.from(new Set(value.split(',').map((v) => v.trim()).filter(Boolean))).sort();
+  };
+
+  const parseManagedGroups = (value?: string) => {
+    return Array.from(new Set(
+      String(value || '')
+        .split(',')
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean)
+    ));
+  };
+
+  const getDisplayRole = (user: User) => {
+    if (user.role === 'admin') return 'Admin';
+    if (user.role === 'employee' && parseManagedGroups(user.managed_groups).length > 0) return 'Manager';
+    if (user.role === 'employee') return 'Employee';
+    return 'Customer';
   };
 
   const load = useCallback(async () => {
@@ -63,6 +81,11 @@ export default function AdminUsersPage() {
       nextDrafts[user.email] = parseAvailabilityDates(user.available_dates);
     }
     setAvailabilityDrafts(nextDrafts);
+    const nextManagedGroups: Record<string, string> = {};
+    for (const user of loadedUsers as User[]) {
+      nextManagedGroups[user.email] = String(user.managed_groups || '');
+    }
+    setManagedGroupDrafts(nextManagedGroups);
 
     setLoading(false);
   }, []);
@@ -75,7 +98,7 @@ export default function AdminUsersPage() {
     return () => clearTimeout(timer);
   }, [load]);
 
-  const updateUser = async (email: string, payload: { role?: User['role']; active?: string; available_dates?: string }) => {
+  const updateUser = async (email: string, payload: { role?: User['role']; active?: string; available_dates?: string; managed_groups?: string }) => {
     const response = await fetch(`/api/users/${encodeURIComponent(email)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -98,6 +121,10 @@ export default function AdminUsersPage() {
 
   const setAvailability = async (email: string, available_dates: string) => {
     await updateUser(email, { available_dates });
+  };
+
+  const setManagedGroups = async (email: string, managed_groups: string) => {
+    await updateUser(email, { managed_groups });
   };
 
   const addAvailabilityDate = (email: string) => {
@@ -224,6 +251,7 @@ export default function AdminUsersPage() {
                 <th className="px-4 py-3 text-left text-sm">Role</th>
                 <th className="px-4 py-3 text-left text-sm">Active</th>
                 <th className="px-4 py-3 text-left text-sm">Available Dates</th>
+                <th className="px-4 py-3 text-left text-sm">Manager Groups</th>
                 <th className="px-4 py-3 text-left text-sm">Actions</th>
               </tr>
             </thead>
@@ -233,7 +261,7 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3 text-sm">{user.full_name}</td>
                   <td className="px-4 py-3 text-sm">{user.email}</td>
                   <td className="px-4 py-3 text-sm">{user.phone || '-'}</td>
-                  <td className="px-4 py-3 text-sm font-semibold">{user.role}</td>
+                  <td className="px-4 py-3 text-sm font-semibold">{getDisplayRole(user)}</td>
                   <td className="px-4 py-3 text-sm">
                     <select
                       value={String(user.active || 'true')}
@@ -287,6 +315,28 @@ export default function AdminUsersPage() {
                           </button>
                         ))}
                       </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="min-w-72 space-y-2">
+                      <input
+                        type="text"
+                        value={managedGroupDrafts[user.email] || ''}
+                        onChange={(e) => setManagedGroupDrafts((prev) => ({
+                          ...prev,
+                          [user.email]: e.target.value,
+                        }))}
+                        className="w-full px-2 py-1 border rounded"
+                        placeholder="north-team, south-team"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void setManagedGroups(user.email, managedGroupDrafts[user.email] || '')}
+                        className="px-2 py-1 bg-violet-600 text-white rounded"
+                      >
+                        Save Groups
+                      </button>
+                      <p className="text-xs text-gray-500">Users with groups can manage interview calls/messages for matching application groups.</p>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm">

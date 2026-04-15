@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
       full_name: user.full_name,
       role: resolvedRole,
       phone: user.phone,
+      managed_groups: user.managed_groups || '',
     },
   });
 

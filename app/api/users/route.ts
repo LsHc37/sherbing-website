@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
       role: user.role,
       active: user.active,
       available_dates: user.available_dates || '',
+      managed_groups: user.managed_groups || '',
     }));
 
     return NextResponse.json(safeUsers);
