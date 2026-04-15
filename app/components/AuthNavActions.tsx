@@ -50,6 +50,9 @@ export default function AuthNavActions() {
   if (loading) {
     return (
       <div className="flex items-center gap-3">
+        <Link href="/careers" className="btn-secondary text-sm sm:text-base">
+          Careers
+        </Link>
         <Link href="/about" className="btn-secondary text-sm sm:text-base">
           About Us
         </Link>
@@ -63,6 +66,9 @@ export default function AuthNavActions() {
 
     return (
       <div className="flex items-center gap-3">
+        <Link href="/careers" className="btn-secondary text-sm sm:text-base">
+          Careers
+        </Link>
         <Link href="/about" className="btn-secondary text-sm sm:text-base">
           About Us
         </Link>
@@ -78,6 +84,9 @@ export default function AuthNavActions() {
 
   return (
     <div className="flex items-center gap-3">
+      <Link href="/careers" className="btn-secondary text-sm sm:text-base">
+        Careers
+      </Link>
       <Link href="/about" className="btn-secondary text-sm sm:text-base">
         About Us
       </Link>

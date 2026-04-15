@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import type { JWTInput } from 'google-auth-library';
 import type { BookingForm } from '@/lib/types';
+import type { JobApplication, JobApplicationStatus } from '@/lib/types';
 import { calculatePayoutBreakdown } from '@/lib/services/payoutService';
 
 type BookingSheetRow = {
@@ -49,6 +50,30 @@ type UserSheetRow = {
   available_dates?: string;
 };
 
+type JobApplicationSheetRow = {
+  created_at: string;
+  application_id: string;
+  full_name: string;
+  phone: string;
+  email: string;
+  city_zip: string;
+  previous_experience: string;
+  previous_experience_details: string;
+  equipment_known: string;
+  can_lift_50_plus_lbs: string;
+  has_valid_license_and_transportation: string;
+  available_start_date: string;
+  general_availability: string;
+  why_work_for_sherbing: string;
+  own_equipment: string;
+  resume_file_name: string;
+  resume_url: string;
+  resume_mime_type: string;
+  status: JobApplicationStatus;
+  reviewed_by?: string;
+  reviewed_at?: string;
+};
+
 const authConfig: JWTInput = {
   type: 'service_account',
   project_id: 'sherbing-booking',
@@ -60,6 +85,7 @@ const authConfig: JWTInput = {
 
 const bookingsTabName = () => process.env.GOOGLE_SHEETS_TAB_NAME || 'Bookings';
 const usersTabName = () => process.env.GOOGLE_USERS_TAB_NAME || 'Users';
+const jobApplicationsTabName = () => process.env.GOOGLE_JOB_APPLICATIONS_TAB_NAME || 'Job Applications';
 
 type SheetsClient = {
   sheets: ReturnType<typeof google.sheets>;
@@ -286,10 +312,37 @@ export async function initializeSheet() {
     'Available Dates',
   ];
 
+  const jobApplicationHeaders = [
+    'Created At',
+    'Application ID',
+    'Full Name',
+    'Phone',
+    'Email',
+    'City and Zip Code',
+    'Previous Experience',
+    'Previous Experience Details',
+    'Equipment Known',
+    'Can Lift 50+ lbs',
+    'Valid License and Transportation',
+    'Available Start Date',
+    'General Availability',
+    'Why Work for Sherbing',
+    'Own Equipment',
+    'Resume File Name',
+    'Resume URL',
+    'Resume Mime Type',
+    'Status',
+    'Reviewed By',
+    'Reviewed At',
+  ];
+
   const bookingInit = await ensureHeaders(bookingsTabName(), bookingHeaders);
   if (!bookingInit.success) return bookingInit;
 
-  return ensureHeaders(usersTabName(), userHeaders);
+  const usersInit = await ensureHeaders(usersTabName(), userHeaders);
+  if (!usersInit.success) return usersInit;
+
+  return ensureHeaders(jobApplicationsTabName(), jobApplicationHeaders);
 }
 
 function parseBookingRows(rows: string[][]): BookingSheetRow[] {
@@ -469,9 +522,60 @@ function parseUserRows(rows: string[][]): UserSheetRow[] {
   }));
 }
 
+function parseJobApplicationRows(rows: string[][]): JobApplication[] {
+  if (rows.length < 2) return [];
+  const headers = rows[0];
+  const idx = (name: string) => headers.indexOf(name);
+  const get = (row: Array<string | number>, name: string) => {
+    const index = idx(name);
+    if (index < 0) return '';
+    const value = row[index];
+    return value === undefined || value === null ? '' : String(value);
+  };
+  const normalizeSelection = (value: string) => String(value || '').trim().toLowerCase();
+
+  return rows.slice(1).map((row, rowOffset) => {
+    const rawEquipment = get(row, 'Equipment Known');
+    const applicationId = get(row, 'Application ID').trim() || `ROW-${rowOffset + 2}`;
+    const status = normalizeSelection(get(row, 'Status')) as JobApplicationStatus;
+
+    return {
+      id: applicationId,
+      created_at: get(row, 'Created At'),
+      full_name: get(row, 'Full Name').trim(),
+      phone: get(row, 'Phone').trim(),
+      email: get(row, 'Email').trim().toLowerCase(),
+      city_zip: get(row, 'City and Zip Code').trim(),
+      previous_experience: normalizeSelection(get(row, 'Previous Experience')) === 'yes' ? 'yes' : 'no',
+      previous_experience_details: get(row, 'Previous Experience Details').trim(),
+      equipment_known: rawEquipment
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+      can_lift_50_plus_lbs: normalizeSelection(get(row, 'Can Lift 50+ lbs')) === 'yes' ? 'yes' : 'no',
+      has_valid_license_and_transportation: normalizeSelection(get(row, 'Valid License and Transportation')) === 'yes' ? 'yes' : 'no',
+      available_start_date: get(row, 'Available Start Date').trim(),
+      general_availability: get(row, 'General Availability').trim(),
+      why_work_for_sherbing: get(row, 'Why Work for Sherbing').trim(),
+      own_equipment: get(row, 'Own Equipment').trim(),
+      resume_file_name: get(row, 'Resume File Name').trim(),
+      resume_url: get(row, 'Resume URL').trim(),
+      resume_mime_type: get(row, 'Resume Mime Type').trim(),
+      status: ['new', 'reviewing', 'interview', 'hired', 'rejected'].includes(status) ? status : 'new',
+      reviewed_by: get(row, 'Reviewed By').trim(),
+      reviewed_at: get(row, 'Reviewed At').trim(),
+    };
+  });
+}
+
 export async function listUsersFromSheet() {
   const rows = await getTabRows(usersTabName());
   return parseUserRows(rows);
+}
+
+export async function listJobApplicationsFromSheet() {
+  const rows = await getTabRows(jobApplicationsTabName());
+  return parseJobApplicationRows(rows);
 }
 
 export async function addBookingToSheet(booking: BookingForm & { booking_id: string; estimated_price: number }) {
@@ -1173,6 +1277,107 @@ export async function createUserInSheet(user: {
         '', // Available Dates
       ]],
     },
+  }));
+
+  return { success: true };
+}
+
+export async function addJobApplicationToSheet(application: {
+  id: string;
+  full_name: string;
+  phone: string;
+  email: string;
+  city_zip: string;
+  previous_experience: 'yes' | 'no';
+  previous_experience_details: string;
+  equipment_known: string[];
+  can_lift_50_plus_lbs: 'yes' | 'no';
+  has_valid_license_and_transportation: 'yes' | 'no';
+  available_start_date: string;
+  general_availability: string;
+  why_work_for_sherbing: string;
+  own_equipment: string;
+  resume_file_name: string;
+  resume_url: string;
+  resume_mime_type: string;
+  status?: JobApplicationStatus;
+}) {
+  const init = await initializeSheet();
+  if (!init.success) return init;
+
+  const client = await getSheetsClient();
+  if (!client) return { success: false, error: 'Google Sheets not configured' };
+
+  const { sheets, spreadsheetId } = client;
+  await withRetry(() => sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `${jobApplicationsTabName()}!A1`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [[
+        new Date().toISOString(),
+        application.id,
+        application.full_name,
+        application.phone,
+        application.email.toLowerCase(),
+        application.city_zip,
+        application.previous_experience,
+        application.previous_experience_details,
+        application.equipment_known.join(', '),
+        application.can_lift_50_plus_lbs,
+        application.has_valid_license_and_transportation,
+        application.available_start_date,
+        application.general_availability,
+        application.why_work_for_sherbing,
+        application.own_equipment,
+        application.resume_file_name,
+        application.resume_url,
+        application.resume_mime_type,
+        application.status || 'new',
+        '',
+        '',
+      ]],
+    },
+  }));
+
+  return { success: true };
+}
+
+export async function updateJobApplicationInSheet(
+  applicationId: string,
+  updates: Partial<Pick<JobApplicationSheetRow, 'status' | 'reviewed_by' | 'reviewed_at'>>
+) {
+  const client = await getSheetsClient();
+  if (!client) return { success: false, error: 'Google Sheets not configured' };
+
+  const { sheets, spreadsheetId } = client;
+  const rows = await getTabRows(jobApplicationsTabName());
+  if (rows.length < 2) return { success: false, error: 'No job applications found' };
+
+  const headers = rows[0];
+  const idIdx = headers.indexOf('Application ID');
+  const rowIndex = rows.findIndex((r, i) => i > 0 && String(r[idIdx] || '').trim() === applicationId);
+  if (rowIndex === -1) return { success: false, error: 'Job application not found' };
+
+  const row = rows[rowIndex];
+  const set = (header: string, value?: string) => {
+    const index = headers.indexOf(header);
+    if (index === -1 || value === undefined) return;
+    row[index] = value;
+  };
+
+  set('Status', updates.status);
+  set('Reviewed By', updates.reviewed_by);
+  set('Reviewed At', updates.reviewed_at);
+
+  const endColumn = columnNumberToName(headers.length);
+  const range = `${jobApplicationsTabName()}!A${rowIndex + 1}:${endColumn}${rowIndex + 1}`;
+
+  await withRetry(() => sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [row] },
   }));
 
   return { success: true };

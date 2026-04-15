@@ -169,6 +169,7 @@ export default function AdminUsersPage() {
           </div>
           <div className="flex items-center gap-4">
             <Link href="/admin/booking" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>
+            <Link href="/employee/job-applications" className="text-gray-700 hover:text-gray-900">Job Applications</Link>
             <Link href="/employee/dashboard" className="text-gray-700 hover:text-gray-900">Back to Dashboard</Link>
           </div>
         </div>

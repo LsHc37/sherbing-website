@@ -599,6 +599,12 @@ export default function EmployeeDashboardPage() {
             >
               Calendar
             </button>
+            <button
+              onClick={() => router.push('/employee/job-applications')}
+              className="text-gray-700 hover:text-gray-900"
+            >
+              Job Applications
+            </button>
             {user?.role === 'admin' && <Link href="/admin/users" className="text-gray-700 hover:text-gray-900">Manage Users</Link>}
             {user?.role === 'admin' && <Link href="/admin/booking" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>}
             <button onClick={logout} className="text-gray-700 hover:text-gray-900">Logout</button>

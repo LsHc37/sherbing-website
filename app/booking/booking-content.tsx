@@ -65,6 +65,7 @@ export default function BookingContent() {
   const [estimateSource, setEstimateSource] = useState<EstimateSource>('standard');
   const [inferredPropertySqft, setInferredPropertySqft] = useState<number | null>(null);
   const [inferredYardSqft, setInferredYardSqft] = useState<number | null>(null);
+  const [estimateSummary, setEstimateSummary] = useState('');
   const [estimating, setEstimating] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
@@ -270,6 +271,7 @@ export default function BookingContent() {
 
     setEstimating(true);
     setErrors([]);
+    setEstimateSummary('');
 
     try {
       const response = await fetch('/api/estimate', {
@@ -303,6 +305,9 @@ export default function BookingContent() {
       const estimatedPriceValue = Number(data.estimated_price);
       const inferredPropertySqftValue = Number(data.inferred_property_sqft);
       const inferredYardSqftValue = Number(data.inferred_yard_sqft);
+      const estimateSummaryValue = typeof data.estimate_summary === 'string'
+        ? data.estimate_summary.trim()
+        : '';
 
       if (Number.isFinite(estimatedPriceValue) && estimatedPriceValue > 0) {
         setEstimatedPrice(estimatedPriceValue);
@@ -318,6 +323,8 @@ export default function BookingContent() {
       if (Number.isFinite(inferredYardSqftValue) && inferredYardSqftValue > 0) {
         setInferredYardSqft(inferredYardSqftValue);
       }
+
+      setEstimateSummary(estimateSummaryValue);
 
       setEstimateSource(data.source === 'ai' ? 'ai' : 'standard');
     } catch (error) {
@@ -611,6 +618,11 @@ export default function BookingContent() {
                 {(inferredPropertySqft || inferredYardSqft) && (
                   <p className="text-xs text-slate-500 mt-1">
                     Inferred size: {inferredPropertySqft || 'N/A'} sqft home, {inferredYardSqft || 'N/A'} sqft lot
+                  </p>
+                )}
+                {estimateSummary && (
+                  <p className="text-sm text-slate-700 mt-3 leading-relaxed">
+                    {estimateSummary}
                   </p>
                 )}
               </div>

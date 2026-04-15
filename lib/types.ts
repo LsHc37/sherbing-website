@@ -111,6 +111,32 @@ export interface Review {
   created_at: string;
 }
 
+export type JobApplicationStatus = 'new' | 'reviewing' | 'interview' | 'hired' | 'rejected';
+
+export interface JobApplication {
+  id: string;
+  created_at: string;
+  full_name: string;
+  phone: string;
+  email: string;
+  city_zip: string;
+  previous_experience: 'yes' | 'no';
+  previous_experience_details: string;
+  equipment_known: string[];
+  can_lift_50_plus_lbs: 'yes' | 'no';
+  has_valid_license_and_transportation: 'yes' | 'no';
+  available_start_date: string;
+  general_availability: string;
+  why_work_for_sherbing: string;
+  own_equipment: string;
+  resume_file_name: string;
+  resume_url: string;
+  resume_mime_type: string;
+  status: JobApplicationStatus;
+  reviewed_by?: string;
+  reviewed_at?: string;
+}
+
 export interface BookingUpdate {
   scheduled_date?: string;
   scheduled_time?: string;

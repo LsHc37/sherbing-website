@@ -46,6 +46,10 @@ type PackageRule = {
   discountPercent: number;
 };
 
+const LAWN_TARGET_HOURLY_RATE = 45;
+const LAWN_BASE_PRODUCTIVITY_SQFT_PER_HOUR = 6200;
+const LAWN_MIN_DURATION_MINUTES = 30;
+
 // Boise service area zip codes
 export const BOISE_SERVICE_AREA_ZIP_CODES = [
   '83702', '83703', '83704', '83705', '83706', '83707', '83708', '83709',
@@ -138,6 +142,90 @@ function roundToNearestFive(value: number): number {
   return Math.round(value / 5) * 5;
 }
 
+function roundMinutesToNearestFive(value: number): number {
+  return Math.round(value / 5) * 5;
+}
+
+function getLawnTierBasePrice(mowableGrass: number, isBiWeekly: boolean): number {
+  if (mowableGrass < 4000) {
+    return isBiWeekly ? 45 : 35;
+  }
+
+  if (mowableGrass < 7000) {
+    return isBiWeekly ? 55 : 45;
+  }
+
+  if (mowableGrass < 10000) {
+    return isBiWeekly ? 70 : 55;
+  }
+
+  if (mowableGrass < 13000) {
+    return isBiWeekly ? 85 : 65;
+  }
+
+  const extraSqft = Math.max(0, mowableGrass - 13000);
+  const extraBlocks = Math.ceil(extraSqft / 3000);
+  const weeklyBase = 65 + (extraBlocks * 10);
+  return isBiWeekly ? roundToNearestFive(weeklyBase * 1.3) : weeklyBase;
+}
+
+function applyLawnConditionAdjustments(basePrice: number, input: LawnMowingPricingInput = {}): number {
+  let adjusted = basePrice;
+
+  if (input.initialOvergrowth) {
+    adjusted *= 1.5;
+  }
+
+  if (input.bagClippings) {
+    adjusted += 10;
+  }
+
+  if (input.heavyPetWaste) {
+    adjusted += 15;
+  }
+
+  if (input.accessBlocked) {
+    adjusted = Math.max(adjusted, 35);
+  }
+
+  return adjusted;
+}
+
+export function estimateLawnMowingDurationMinutes(
+  propertySqft: number,
+  yardSqft: number,
+  input: LawnMowingPricingInput = {}
+): number {
+  const mowableGrass = getEstimatedMowableGrass(propertySqft, yardSqft);
+  let effectiveProductivity = LAWN_BASE_PRODUCTIVITY_SQFT_PER_HOUR;
+
+  if (input.frequency === 'bi_weekly') {
+    effectiveProductivity *= 0.82;
+  }
+
+  if (input.initialOvergrowth) {
+    effectiveProductivity *= 0.62;
+  }
+
+  if (input.heavyPetWaste) {
+    effectiveProductivity *= 0.9;
+  }
+
+  if (input.accessBlocked) {
+    effectiveProductivity *= 0.85;
+  }
+
+  const mowingMinutes = (mowableGrass / Math.max(effectiveProductivity, 1800)) * 60;
+  const setupAndCleanupMinutes = 12;
+  const baggingMinutes = input.bagClippings ? 8 : 0;
+  const petWasteHandlingMinutes = input.heavyPetWaste ? 10 : 0;
+  const accessDelayMinutes = input.accessBlocked ? 8 : 0;
+
+  const rawMinutes = mowingMinutes + setupAndCleanupMinutes + baggingMinutes + petWasteHandlingMinutes + accessDelayMinutes;
+  const minDuration = input.initialOvergrowth ? 45 : LAWN_MIN_DURATION_MINUTES;
+  return Math.max(minDuration, roundMinutesToNearestFive(rawMinutes));
+}
+
 function estimateLawnMowingPrice(
   propertySqft: number,
   yardSqft: number,
@@ -147,40 +235,11 @@ function estimateLawnMowingPrice(
   const frequency = input.frequency || 'weekly';
   const isBiWeekly = frequency === 'bi_weekly';
 
-  let basePrice: number;
+  const tierPrice = applyLawnConditionAdjustments(getLawnTierBasePrice(mowableGrass, isBiWeekly), input);
+  const durationMinutes = estimateLawnMowingDurationMinutes(propertySqft, yardSqft, input);
+  const laborPrice = (durationMinutes / 60) * LAWN_TARGET_HOURLY_RATE;
 
-  if (mowableGrass < 4000) {
-    basePrice = isBiWeekly ? 45 : 35;
-  } else if (mowableGrass < 7000) {
-    basePrice = isBiWeekly ? 55 : 45;
-  } else if (mowableGrass < 10000) {
-    basePrice = isBiWeekly ? 70 : 55;
-  } else if (mowableGrass < 13000) {
-    basePrice = isBiWeekly ? 85 : 65;
-  } else {
-    const extraSqft = Math.max(0, mowableGrass - 13000);
-    const extraBlocks = Math.ceil(extraSqft / 3000);
-    const weeklyBase = 65 + (extraBlocks * 10);
-    basePrice = isBiWeekly ? roundToNearestFive(weeklyBase * 1.3) : weeklyBase;
-  }
-
-  if (input.initialOvergrowth) {
-    basePrice *= 1.5;
-  }
-
-  if (input.bagClippings) {
-    basePrice += 10;
-  }
-
-  if (input.heavyPetWaste) {
-    basePrice += 15;
-  }
-
-  if (input.accessBlocked) {
-    basePrice = Math.max(basePrice, 35);
-  }
-
-  return roundToNearestFive(basePrice);
+  return roundToNearestFive(Math.max(35, tierPrice, laborPrice));
 }
 
 function estimateGutterCleaningPrice(

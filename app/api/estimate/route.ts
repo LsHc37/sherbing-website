@@ -1,5 +1,12 @@
 import { AI_PRICING_CONTEXT } from '@/lib/ai/pricingContext';
-import { calculateMultiServiceEstimate, SERVICE_PACKAGES, SERVICE_PRICING } from '@/lib/services/pricingService';
+import {
+  calculateMultiServiceEstimate,
+  estimateLawnMowingDurationMinutes,
+  SERVICE_PACKAGES,
+  SERVICE_PRICING,
+} from '@/lib/services/pricingService';
+import { getPropertyPricingInsights } from '@/lib/services/propertyInsightsService';
+import type { PropertyPricingInsights } from '@/lib/services/propertyInsightsService';
 import { NextRequest, NextResponse } from 'next/server';
 
 type EstimatePayload = {
@@ -22,6 +29,143 @@ type EstimatePayload = {
   property_sqft?: number;
   yard_sqft?: number;
 };
+
+function truncateText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 3).trim()}...`;
+}
+
+function formatServiceNames(serviceIds: string[]): string {
+  const names = serviceIds
+    .map((serviceId) => SERVICE_PRICING[serviceId]?.name || serviceId.replace(/_/g, ' '));
+
+  if (names.length <= 1) {
+    return names[0] || 'service';
+  }
+
+  if (names.length === 2) {
+    return `${names[0]} and ${names[1]}`;
+  }
+
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+}
+
+function buildEstimateSummary(
+  payload: EstimatePayload,
+  estimatedPrice: number,
+  propertySqft: number,
+  yardSqft: number,
+  lawnDurationMinutes: number | null,
+  aiReasoning?: string
+): string {
+  const serviceLabel = formatServiceNames(payload.service_ids);
+  const summaryParts: string[] = [];
+
+  summaryParts.push(
+    `This quote covers ${serviceLabel} based on an estimated ${Math.round(propertySqft).toLocaleString()} sqft home and ${Math.round(yardSqft).toLocaleString()} sqft lot.`
+  );
+
+  const includesLawn = payload.service_ids.includes('lawn_mowing');
+  if (includesLawn && lawnDurationMinutes) {
+    const frequencyLabel = payload.lawn_mowing_frequency === 'bi_weekly' ? 'bi-weekly' : 'weekly';
+    const overgrowthLabel = payload.lawn_initial_overgrowth
+      ? 'includes overgrowth recovery time'
+      : 'has no overgrowth surcharge';
+
+    summaryParts.push(
+      `Lawn service is estimated at about ${lawnDurationMinutes} minutes (${frequencyLabel}) and ${overgrowthLabel}, with labor protected at about $45/hour.`
+    );
+  }
+
+  if (payload.package_id) {
+    const packageName = SERVICE_PACKAGES.find((pkg) => pkg.id === payload.package_id)?.name;
+    if (packageName) {
+      summaryParts.push(`Package pricing was applied using ${packageName}.`);
+    }
+  }
+
+  if (aiReasoning && aiReasoning.trim()) {
+    summaryParts.push(`Pricing note: ${truncateText(aiReasoning.trim(), 180)}`);
+  }
+
+  summaryParts.push(`Estimated total: $${estimatedPrice.toFixed(2)}.`);
+  return summaryParts.join(' ');
+}
+
+function roundToNearestFive(value: number): number {
+  return Math.round(value / 5) * 5;
+}
+
+function hasLawnAddOns(payload: EstimatePayload): boolean {
+  return Boolean(
+    payload.lawn_initial_overgrowth
+    || payload.lawn_bag_clippings
+    || payload.lawn_heavy_pet_waste
+    || payload.lawn_access_blocked
+  );
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function adjustLawnQuoteLikeWalkthrough(
+  payload: EstimatePayload,
+  currentEstimate: number,
+  deterministicFloorEstimate: number,
+  propertySqft: number,
+  yardSqft: number,
+  insights: PropertyPricingInsights
+): number {
+  const onlyLawnMowing = payload.service_ids.length === 1 && payload.service_ids[0] === 'lawn_mowing';
+  if (!onlyLawnMowing || hasLawnAddOns(payload)) {
+    return currentEstimate;
+  }
+
+  const frequencyMultiplier = payload.lawn_mowing_frequency === 'bi_weekly' ? 1.3 : 1;
+  const weeklyFromCurrent = currentEstimate / frequencyMultiplier;
+
+  const exactWeekly = Number(insights.lawnWeeklyBasePrice || 0) || undefined;
+  const comparableWeeklyRaw = Number(insights.comparableLawnWeeklyPrice || 0) || undefined;
+  const comparableMedianYardSqft = Number(insights.comparableMedianYardSqft || 0) || undefined;
+
+  let comparableWeekly = comparableWeeklyRaw;
+  if (comparableWeekly && comparableMedianYardSqft && comparableMedianYardSqft > 0 && yardSqft > 0) {
+    const sizeFactor = clamp(Math.sqrt(yardSqft / comparableMedianYardSqft), 0.82, 1.22);
+    comparableWeekly *= sizeFactor;
+  }
+
+  let targetWeekly = weeklyFromCurrent;
+  if (exactWeekly && comparableWeekly) {
+    targetWeekly = exactWeekly * 0.75 + comparableWeekly * 0.25;
+  } else if (exactWeekly) {
+    targetWeekly = exactWeekly;
+  } else if (comparableWeekly) {
+    targetWeekly = comparableWeekly;
+  }
+
+  const lotRatio = yardSqft > 0 && propertySqft > 0 ? yardSqft / propertySqft : 0;
+  if (yardSqft > 0 && (yardSqft < 4000 || (lotRatio > 0 && lotRatio < 1.8))) {
+    targetWeekly *= 0.92;
+  } else if (yardSqft > 9000 || lotRatio > 3.8) {
+    targetWeekly *= 1.08;
+  }
+
+  const notes = String(payload.notes || '').toLowerCase();
+  if (/small yard|small lawn|tiny yard|tiny lawn|front only/.test(notes)) {
+    targetWeekly *= 0.9;
+  }
+  if (/corner lot|steep|slope|fenced|obstacle|edging/.test(notes)) {
+    targetWeekly *= 1.1;
+  }
+
+  const walkthroughAdjusted = targetWeekly * frequencyMultiplier;
+  const blended = (currentEstimate * 0.45) + (walkthroughAdjusted * 0.55);
+  return Math.max(deterministicFloorEstimate, 25, roundToNearestFive(blended));
+}
 
 function fallbackEstimate(payload: EstimatePayload): number {
   const propertySqft = Number(payload.property_sqft || 1840);
@@ -91,7 +235,42 @@ export async function POST(request: NextRequest) {
       property_sqft: property_sqft || undefined,
       yard_sqft: yard_sqft || undefined,
     };
-    const localEstimate = fallbackEstimate(payload);
+
+    const propertyInsights = await getPropertyPricingInsights({
+      address,
+      city,
+      state,
+      zipCode: zip_code,
+    });
+
+    const baselinePropertySqft = property_sqft || propertyInsights.propertySqft || 1840;
+    const baselineYardSqft = yard_sqft || propertyInsights.yardSqft || 5500;
+
+    const enrichedPayload: EstimatePayload = {
+      ...payload,
+      property_sqft: baselinePropertySqft,
+      yard_sqft: baselineYardSqft,
+    };
+
+    const localEstimate = fallbackEstimate(enrichedPayload);
+    const walkthroughAdjustedLocalEstimate = adjustLawnQuoteLikeWalkthrough(
+      enrichedPayload,
+      localEstimate,
+      localEstimate,
+      baselinePropertySqft,
+      baselineYardSqft,
+      propertyInsights
+    );
+
+    const localLawnDurationMinutes = service_ids.includes('lawn_mowing')
+      ? estimateLawnMowingDurationMinutes(baselinePropertySqft, baselineYardSqft, {
+        frequency: lawn_mowing_frequency,
+        initialOvergrowth: lawn_initial_overgrowth,
+        bagClippings: lawn_bag_clippings,
+        heavyPetWaste: lawn_heavy_pet_waste,
+        accessBlocked: lawn_access_blocked,
+      })
+      : null;
     const selectedServices = service_ids
       .map((id) => ({ id, pricing: SERVICE_PRICING[id] }))
       .filter((item) => !!item.pricing)
@@ -109,14 +288,24 @@ export async function POST(request: NextRequest) {
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      const fallbackProperty = property_sqft || 1840;
-      const fallbackYard = yard_sqft || 5500;
+      const fallbackProperty = baselinePropertySqft;
+      const fallbackYard = baselineYardSqft;
+      const estimateSummary = buildEstimateSummary(
+        enrichedPayload,
+        walkthroughAdjustedLocalEstimate,
+        fallbackProperty,
+        fallbackYard,
+        localLawnDurationMinutes
+      );
+
       return NextResponse.json(
         {
-          estimated_price: localEstimate,
+          estimated_price: walkthroughAdjustedLocalEstimate,
           source: 'standard',
           inferred_property_sqft: fallbackProperty,
           inferred_yard_sqft: fallbackYard,
+          estimated_lawn_duration_minutes: localLawnDurationMinutes,
+          estimate_summary: estimateSummary,
         },
         { status: 200 }
       );
@@ -136,8 +325,12 @@ export async function POST(request: NextRequest) {
       `Customer notes: ${notes || 'none'}`,
       `Known property sqft from user (if any): ${property_sqft || 'unknown'}`,
       `Known yard sqft from user (if any): ${yard_sqft || 'unknown'}`,
-      `Standard estimate: ${localEstimate}`,
+      `Historical property insights for this exact address: ${JSON.stringify(propertyInsights)}`,
+      `Standard estimate: ${walkthroughAdjustedLocalEstimate}`,
       `Pricing context and examples: ${JSON.stringify(AI_PRICING_CONTEXT)}`,
+      'When historical insights are present for this exact address, prioritize them over generic neighborhood assumptions.',
+      'Use nearby comparables from matching ZIP and same street when available to mimic a field walkthrough quote.',
+      'For lawn mowing, protect at least a $45/hour effective rate based on estimated mowing time and service complexity.',
       'Infer realistic Boise home/property sizes from the address and apply service complexity and package discount.',
       'Estimated price must be competitive and greater than zero.',
     ].join('\n');
@@ -159,21 +352,41 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
-      return NextResponse.json({ estimated_price: localEstimate, source: 'standard' }, { status: 200 });
+      const estimateSummary = buildEstimateSummary(
+        enrichedPayload,
+        walkthroughAdjustedLocalEstimate,
+        baselinePropertySqft,
+        baselineYardSqft,
+        localLawnDurationMinutes
+      );
+
+      return NextResponse.json(
+        {
+          estimated_price: walkthroughAdjustedLocalEstimate,
+          source: 'standard',
+          inferred_property_sqft: baselinePropertySqft,
+          inferred_yard_sqft: baselineYardSqft,
+          estimated_lawn_duration_minutes: localLawnDurationMinutes,
+          estimate_summary: estimateSummary,
+        },
+        { status: 200 }
+      );
     }
 
     const data = await response.json();
     const content = data?.choices?.[0]?.message?.content as string | undefined;
 
-    let estimated_price = localEstimate;
-    let inferred_property_sqft = property_sqft || 1840;
-    let inferred_yard_sqft = yard_sqft || 5500;
+    let estimated_price = walkthroughAdjustedLocalEstimate;
+    let inferred_property_sqft = baselinePropertySqft;
+    let inferred_yard_sqft = baselineYardSqft;
+    let aiReasoning = '';
     if (content) {
       try {
         const parsed = JSON.parse(content);
         const parsedValue = Number(parsed?.estimated_price);
         const parsedPropertySqft = Number(parsed?.inferred_property_sqft);
         const parsedYardSqft = Number(parsed?.inferred_yard_sqft);
+        const parsedReasoning = typeof parsed?.reasoning === 'string' ? parsed.reasoning : '';
 
         if (Number.isFinite(parsedValue) && parsedValue > 0) {
           estimated_price = parsedValue;
@@ -183,6 +396,9 @@ export async function POST(request: NextRequest) {
         }
         if (Number.isFinite(parsedYardSqft) && parsedYardSqft > 0) {
           inferred_yard_sqft = parsedYardSqft;
+        }
+        if (parsedReasoning.trim()) {
+          aiReasoning = parsedReasoning;
         }
       } catch {
         const match = content.match(/\d+(?:\.\d+)?/);
@@ -195,25 +411,52 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const safeEstimated = Math.max(
-      estimated_price,
-      calculateMultiServiceEstimate(service_ids, inferred_property_sqft, inferred_yard_sqft, package_id, {
-        lawnMowing: {
-          frequency: lawn_mowing_frequency,
-          initialOvergrowth: lawn_initial_overgrowth,
-          bagClippings: lawn_bag_clippings,
-          heavyPetWaste: lawn_heavy_pet_waste,
-          accessBlocked: lawn_access_blocked,
-        },
-        windowCleaning: {
-          windowCount: window_count,
-          scope: window_scope,
-          screenTrackCount: window_screen_track_count,
-        },
-        gutterCleaning: {
-          storyCount: gutter_story_count,
-        },
+    const deterministicFloorEstimate = calculateMultiServiceEstimate(service_ids, inferred_property_sqft, inferred_yard_sqft, package_id, {
+      lawnMowing: {
+        frequency: lawn_mowing_frequency,
+        initialOvergrowth: lawn_initial_overgrowth,
+        bagClippings: lawn_bag_clippings,
+        heavyPetWaste: lawn_heavy_pet_waste,
+        accessBlocked: lawn_access_blocked,
+      },
+      windowCleaning: {
+        windowCount: window_count,
+        scope: window_scope,
+        screenTrackCount: window_screen_track_count,
+      },
+      gutterCleaning: {
+        storyCount: gutter_story_count,
+      },
+    });
+
+    let safeEstimated = Math.max(estimated_price, deterministicFloorEstimate);
+
+    safeEstimated = adjustLawnQuoteLikeWalkthrough(
+      enrichedPayload,
+      safeEstimated,
+      deterministicFloorEstimate,
+      inferred_property_sqft,
+      inferred_yard_sqft,
+      propertyInsights
+    );
+
+    const inferredLawnDurationMinutes = service_ids.includes('lawn_mowing')
+      ? estimateLawnMowingDurationMinutes(inferred_property_sqft, inferred_yard_sqft, {
+        frequency: lawn_mowing_frequency,
+        initialOvergrowth: lawn_initial_overgrowth,
+        bagClippings: lawn_bag_clippings,
+        heavyPetWaste: lawn_heavy_pet_waste,
+        accessBlocked: lawn_access_blocked,
       })
+      : null;
+
+    const estimateSummary = buildEstimateSummary(
+      enrichedPayload,
+      safeEstimated,
+      inferred_property_sqft,
+      inferred_yard_sqft,
+      inferredLawnDurationMinutes,
+      aiReasoning
     );
 
     return NextResponse.json(
@@ -222,6 +465,8 @@ export async function POST(request: NextRequest) {
         source: 'ai',
         inferred_property_sqft,
         inferred_yard_sqft,
+        estimated_lawn_duration_minutes: inferredLawnDurationMinutes,
+        estimate_summary: estimateSummary,
       },
       { status: 200 }
     );
