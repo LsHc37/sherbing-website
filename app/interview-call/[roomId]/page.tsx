@@ -2,55 +2,66 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 
-type PollSignal = {
-  id: string;
-  to: string;
-  from: string;
-  type: 'offer' | 'answer' | 'ice';
-  payload: unknown;
-  createdAt: number;
-};
-
-type PollParticipant = {
+type CallParticipant = {
   id: string;
   name: string;
   joinedAt: number;
+};
+
+type SignalPayload = {
+  from: string;
+  to?: string;
+  description?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
 };
 
 function randomId() {
   return `p-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export default function InterviewCallPage({ params }: { params: { roomId: string } }) {
-  const roomId = String(params.roomId || '').trim();
+export default function InterviewCallPage({ params }: { params: Promise<{ roomId: string }> }) {
+  const [roomId, setRoomId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [joined, setJoined] = useState(false);
   const [status, setStatus] = useState('Waiting to join call...');
-  const [participants, setParticipants] = useState<PollParticipant[]>([]);
+  const [participants, setParticipants] = useState<CallParticipant[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
 
+  const channelRef = useRef<RealtimeChannel | null>(null);
   const participantIdRef = useRef<string>(randomId());
-  const lastSeenSignalTimeRef = useRef<number>(0);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteParticipantIdRef = useRef<string>('');
+  const makingOfferRef = useRef(false);
+  const ignoreOfferRef = useRef(false);
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
 
+  useEffect(() => {
+    void (async () => {
+      const resolved = await params;
+      setRoomId(String(resolved.roomId || '').trim());
+    })();
+  }, [params]);
+
   const shareUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
+    if (!roomId) return '';
     return `${window.location.origin}/interview-call/${encodeURIComponent(roomId)}`;
   }, [roomId]);
 
-  const postAction = async (payload: unknown) => {
-    await fetch(`/api/interview-calls/${encodeURIComponent(roomId)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+  const sendSignal = async (payload: SignalPayload) => {
+    if (!channelRef.current) return;
+    await channelRef.current.send({
+      type: 'broadcast',
+      event: 'signal',
+      payload,
     });
   };
 
@@ -61,14 +72,29 @@ export default function InterviewCallPage({ params }: { params: { roomId: string
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
     });
 
+    peer.onnegotiationneeded = async () => {
+      if (!joined) return;
+      try {
+        makingOfferRef.current = true;
+        await peer.setLocalDescription();
+        await sendSignal({
+          from: participantIdRef.current,
+          to: remoteParticipantIdRef.current || '*',
+          description: peer.localDescription || undefined,
+        });
+      } catch {
+        // Ignore negotiation retries.
+      } finally {
+        makingOfferRef.current = false;
+      }
+    };
+
     peer.onicecandidate = (event) => {
-      if (!event.candidate || !remoteParticipantIdRef.current) return;
-      void postAction({
-        action: 'signal',
-        participantId: participantIdRef.current,
-        to: remoteParticipantIdRef.current,
-        type: 'ice',
-        payload: event.candidate,
+      if (!event.candidate) return;
+      void sendSignal({
+        from: participantIdRef.current,
+        to: remoteParticipantIdRef.current || '*',
+        candidate: event.candidate.toJSON(),
       });
     };
 
@@ -88,90 +114,85 @@ export default function InterviewCallPage({ params }: { params: { roomId: string
     return peer;
   };
 
-  const createOfferFor = async (targetParticipantId: string) => {
-    if (!targetParticipantId) return;
-    remoteParticipantIdRef.current = targetParticipantId;
+  const handleSignal = async (signal: SignalPayload) => {
+    if (signal.from === participantIdRef.current) return;
+    if (signal.to && signal.to !== '*' && signal.to !== participantIdRef.current) return;
 
-    const peer = ensurePeer();
-    const offer = await peer.createOffer();
-    await peer.setLocalDescription(offer);
-
-    await postAction({
-      action: 'signal',
-      participantId: participantIdRef.current,
-      to: targetParticipantId,
-      type: 'offer',
-      payload: offer,
-    });
-
-    setStatus('Calling participant...');
-  };
-
-  const handleSignal = async (signal: PollSignal) => {
     const peer = ensurePeer();
     remoteParticipantIdRef.current = signal.from;
 
-    if (signal.type === 'offer') {
-      await peer.setRemoteDescription(signal.payload as RTCSessionDescriptionInit);
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-      await postAction({
-        action: 'signal',
-        participantId: participantIdRef.current,
-        to: signal.from,
-        type: 'answer',
-        payload: answer,
-      });
-      setStatus('Joining call...');
-      return;
-    }
+    if (signal.description) {
+      const description = signal.description;
+      const polite = participantIdRef.current > signal.from;
+      const offerCollision = description.type === 'offer' && (makingOfferRef.current || peer.signalingState !== 'stable');
+      ignoreOfferRef.current = !polite && offerCollision;
+      if (ignoreOfferRef.current) return;
 
-    if (signal.type === 'answer') {
-      await peer.setRemoteDescription(signal.payload as RTCSessionDescriptionInit);
-      setStatus('Connected');
-      return;
-    }
-
-    if (signal.type === 'ice') {
       try {
-        await peer.addIceCandidate(signal.payload as RTCIceCandidateInit);
+        if (offerCollision && polite) {
+          await peer.setLocalDescription({ type: 'rollback' });
+        }
+        await peer.setRemoteDescription(description);
+        if (description.type === 'offer') {
+          await peer.setLocalDescription();
+          await sendSignal({
+            from: participantIdRef.current,
+            to: signal.from,
+            description: peer.localDescription || undefined,
+          });
+          setStatus('Joining call...');
+        }
       } catch {
-        // Ignore occasional out-of-order candidate errors.
+        // Ignore transient negotiation races.
+      }
+
+      return;
+    }
+
+    if (signal.candidate) {
+      try {
+        await peer.addIceCandidate(signal.candidate);
+      } catch {
+        // Ignore candidate order races.
       }
     }
   };
 
-  const pollRoom = async () => {
-    if (!joined) return;
+  const updateParticipantsFromPresence = () => {
+    const channel = channelRef.current;
+    if (!channel) return;
 
-    const response = await fetch(
-      `/api/interview-calls/${encodeURIComponent(roomId)}?participantId=${encodeURIComponent(participantIdRef.current)}&since=${lastSeenSignalTimeRef.current}`,
-      { cache: 'no-store' }
-    );
-    const data = await response.json().catch(() => ({}));
-
-    const nextParticipants = Array.isArray(data.participants) ? (data.participants as PollParticipant[]) : [];
-    const nextSignals = Array.isArray(data.signals) ? (data.signals as PollSignal[]) : [];
+    const presenceState = channel.presenceState<CallParticipant>();
+    const nextParticipants: CallParticipant[] = Object.values(presenceState)
+      .flat()
+      .map((entry) => ({
+        id: String(entry.id || '').trim(),
+        name: String(entry.name || 'Guest').trim(),
+        joinedAt: Number(entry.joinedAt || Date.now()),
+      }))
+      .filter((entry) => entry.id);
 
     setParticipants(nextParticipants);
 
-    for (const signal of nextSignals) {
-      lastSeenSignalTimeRef.current = Math.max(lastSeenSignalTimeRef.current, Number(signal.createdAt || 0));
-      if (signal.to === participantIdRef.current || signal.to === '*') {
-        await handleSignal(signal);
-      }
+    const otherParticipant = nextParticipants.find((entry) => entry.id !== participantIdRef.current);
+    if (otherParticipant && !remoteParticipantIdRef.current) {
+      remoteParticipantIdRef.current = otherParticipant.id;
+      setStatus('Participant joined, connecting...');
     }
-
-    const otherParticipant = nextParticipants.find((participant) => participant.id !== participantIdRef.current);
-    if (!remoteParticipantIdRef.current && otherParticipant) {
-      await createOfferFor(otherParticipant.id);
-    }
-
-    await postAction({ action: 'heartbeat', participantId: participantIdRef.current });
   };
 
   const joinCall = async () => {
     const safeName = String(displayName || '').trim() || 'Guest';
+
+    if (!roomId) {
+      setStatus('Invalid room id.');
+      return;
+    }
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      setStatus('Supabase realtime is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      return;
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -180,12 +201,43 @@ export default function InterviewCallPage({ params }: { params: { roomId: string
         localVideoRef.current.srcObject = stream;
       }
 
-      await postAction({
-        action: 'join',
-        participantId: participantIdRef.current,
-        participantName: safeName,
+      const supabase = createClient();
+      const channel = supabase.channel(`interview-room-${roomId}`, {
+        config: {
+          presence: {
+            key: participantIdRef.current,
+          },
+        },
       });
 
+      channel
+        .on('presence', { event: 'sync' }, () => {
+          updateParticipantsFromPresence();
+        })
+        .on('broadcast', { event: 'signal' }, (event: { payload: unknown }) => {
+          const payload = event.payload;
+          if (!payload || typeof payload !== 'object') return;
+          void handleSignal(payload as SignalPayload);
+        });
+
+      const subscriptionResult = await new Promise<string>((resolve) => {
+        channel.subscribe((nextStatus) => {
+          resolve(nextStatus);
+        });
+      });
+
+      if (subscriptionResult !== 'SUBSCRIBED') {
+        setStatus('Unable to connect realtime call channel.');
+        return;
+      }
+
+      await channel.track({
+        id: participantIdRef.current,
+        name: safeName,
+        joinedAt: Date.now(),
+      });
+
+      channelRef.current = channel;
       setJoined(true);
       setStatus('Joined. Waiting for the other participant...');
     } catch {
@@ -195,7 +247,12 @@ export default function InterviewCallPage({ params }: { params: { roomId: string
 
   const leaveCall = async () => {
     setJoined(false);
-    await postAction({ action: 'leave', participantId: participantIdRef.current });
+
+    if (channelRef.current) {
+      await channelRef.current.untrack();
+      await channelRef.current.unsubscribe();
+      channelRef.current = null;
+    }
 
     if (peerRef.current) {
       peerRef.current.close();
@@ -208,6 +265,7 @@ export default function InterviewCallPage({ params }: { params: { roomId: string
     }
 
     remoteParticipantIdRef.current = '';
+    setParticipants([]);
     setStatus('Call ended.');
   };
 
@@ -242,23 +300,9 @@ export default function InterviewCallPage({ params }: { params: { roomId: string
   };
 
   useEffect(() => {
-    if (!joined) return;
-
-    const timer = window.setInterval(() => {
-      void pollRoom();
-    }, 1200);
-
-    return () => window.clearInterval(timer);
-    // Polling interval intentionally follows joined state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joined]);
-
-  useEffect(() => {
     return () => {
       void leaveCall();
     };
-    // Cleanup should run once on unmount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
