@@ -85,6 +85,16 @@ function parseManagedGroups(value?: string) {
   ));
 }
 
+function createInternalRoomId(applicationId: string) {
+  const safeBase = String(applicationId || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 24) || 'interview';
+  return `${safeBase}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 export default function EmployeeJobApplicationsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [applications, setApplications] = useState<JobApplication[]>([]);
@@ -252,6 +262,50 @@ export default function EmployeeJobApplicationsPage() {
       await load();
     } finally {
       setSavingId('');
+    }
+  };
+
+  const createInternalCallLink = async (applicationId: string) => {
+    const roomId = createInternalRoomId(applicationId);
+    const internalLink = `/interview-call/${roomId}`;
+    setMeetingUrlDrafts((prev) => ({ ...prev, [applicationId]: internalLink }));
+    setSavingId(`${applicationId}:interview`);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/job-applications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          application_id: applicationId,
+          interview_group: interviewGroupDrafts[applicationId] || '',
+          interview_scheduled_at: interviewDateDrafts[applicationId] || '',
+          interview_meeting_url: internalLink,
+          onboarding_notes: onboardingNotesDrafts[applicationId] || '',
+        }),
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(body?.error || 'Unable to create internal call link');
+        return;
+      }
+
+      setMessage('Internal video call link created. Share it with the interview candidate.');
+      await load();
+    } finally {
+      setSavingId('');
+    }
+  };
+
+  const copyCallLink = async (link: string) => {
+    const fullLink = link.startsWith('/') ? `${window.location.origin}${link}` : link;
+    try {
+      await navigator.clipboard.writeText(fullLink);
+      setMessage('Call link copied to clipboard.');
+    } catch {
+      setError('Unable to copy call link. Copy it manually from the input field.');
     }
   };
 
@@ -547,11 +601,28 @@ export default function EmployeeJobApplicationsPage() {
                     <button
                       type="button"
                       disabled={!canManageInterviewForApplication(application) || savingId === `${application.id}:interview`}
+                      onClick={() => void createInternalCallLink(application.id)}
+                      className="rounded-md bg-indigo-700 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingId === `${application.id}:interview` ? 'Saving...' : 'Create internal call room'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canManageInterviewForApplication(application) || savingId === `${application.id}:interview`}
                       onClick={() => void saveInterviewDetails(application.id)}
                       className="rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {savingId === `${application.id}:interview` ? 'Saving...' : 'Save interview plan'}
                     </button>
+                    {application.interview_meeting_url && (
+                      <button
+                        type="button"
+                        onClick={() => void copyCallLink(application.interview_meeting_url || '')}
+                        className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+                      >
+                        Copy call link
+                      </button>
+                    )}
                     {application.interview_meeting_url && (
                       <a
                         href={application.interview_meeting_url}

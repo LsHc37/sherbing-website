@@ -222,13 +222,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
     if (interviewMeetingUrl) {
-      try {
-        const parsed = new URL(interviewMeetingUrl);
-        if (!['http:', 'https:'].includes(parsed.protocol)) {
-          return NextResponse.json({ error: 'Interview meeting URL must use http or https' }, { status: 400 });
+      const isInternalPath = interviewMeetingUrl.startsWith('/');
+      if (!isInternalPath) {
+        try {
+          const parsed = new URL(interviewMeetingUrl);
+          if (!['http:', 'https:'].includes(parsed.protocol)) {
+            return NextResponse.json({ error: 'Interview meeting URL must use http/https or an internal path' }, { status: 400 });
+          }
+        } catch {
+          return NextResponse.json({ error: 'Interview meeting URL is invalid' }, { status: 400 });
         }
-      } catch {
-        return NextResponse.json({ error: 'Interview meeting URL is invalid' }, { status: 400 });
       }
     }
     const application = await findJobApplicationById(applicationId);
