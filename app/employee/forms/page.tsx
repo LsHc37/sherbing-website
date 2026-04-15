@@ -26,6 +26,9 @@ type OnboardingState = {
   shadow_required: boolean;
   shadow_completed_at: string;
   shadow_mentor_email: string;
+  can_clock_in: boolean;
+  onboarding_stage: 'forms' | 'training' | 'shadow' | 'ready_to_work';
+  completion_percent: number;
   clock_in_at: string;
   clock_out_at: string;
   tracked_minutes_total: string;
@@ -184,6 +187,10 @@ export default function EmployeeFormsPage() {
   };
 
   const isClockedIn = useMemo(() => Boolean(onboarding?.clock_in_at), [onboarding?.clock_in_at]);
+  const formsSignedCount = useMemo(() => {
+    if (!onboarding?.forms) return 0;
+    return Object.values(onboarding.forms).filter(Boolean).length;
+  }, [onboarding?.forms]);
 
   if (loading) {
     return <main className="p-8">Loading forms and compliance...</main>;
@@ -225,15 +232,33 @@ export default function EmployeeFormsPage() {
           </div>
         </div>
 
+        <section className="bg-white rounded-lg shadow p-6 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="text-lg font-bold text-gray-900">Onboarding Progress</h2>
+            <span className="text-sm font-semibold text-gray-700">{onboarding?.completion_percent ?? 0}% complete</span>
+          </div>
+          <div className="h-3 w-full rounded-full bg-gray-200 overflow-hidden">
+            <div
+              className="h-full bg-emerald-600 transition-all"
+              style={{ width: `${Math.max(0, Math.min(100, onboarding?.completion_percent ?? 0))}%` }}
+            />
+          </div>
+          <p className="text-sm text-gray-600">
+            Current stage: {String(onboarding?.onboarding_stage || 'forms').replace(/_/g, ' ')}.
+            {' '}
+            Forms signed: {formsSignedCount}/4.
+          </p>
+        </section>
+
         <section className="bg-white rounded-lg shadow p-6 space-y-4">
           <h2 className="text-xl font-bold text-gray-900">Clock In / Clock Out</h2>
-          <p className="text-sm text-gray-600">Track shift duration so admin can review time spent and job timelines.</p>
+          <p className="text-sm text-gray-600">Track shift duration so admin can review productivity, job duration, and labor planning.</p>
 
           <div className="flex flex-wrap gap-3 items-center">
             {!isClockedIn ? (
               <button
                 type="button"
-                disabled={saving === 'clock-in'}
+                disabled={!onboarding?.can_clock_in || saving === 'clock-in'}
                 onClick={() => void clockIn()}
                 className="px-4 py-2 rounded-md bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-60"
               >
@@ -258,6 +283,12 @@ export default function EmployeeFormsPage() {
           {onboarding?.shadow_required && !onboarding.shadow_completed_at && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 text-sm">
               Shadow requirement is still pending. Complete training and shadow first to unlock solo clock-in.
+            </div>
+          )}
+
+          {!onboarding?.can_clock_in && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              Clock-in is locked until all required forms are signed, training is complete, and shadow requirements are satisfied.
             </div>
           )}
         </section>

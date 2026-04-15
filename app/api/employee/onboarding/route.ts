@@ -23,17 +23,40 @@ function toBool(value?: string) {
   return String(value || '').trim().toLowerCase() === 'true';
 }
 
+function formsStatus(user: Awaited<ReturnType<typeof findUserByEmail>>) {
+  return {
+    terms_of_service: Boolean(user?.forms_terms_signed_at),
+    work_contract: Boolean(user?.forms_work_contract_signed_at),
+    job_description: Boolean(user?.forms_job_description_signed_at),
+    pay_terms: Boolean(user?.forms_pay_terms_signed_at),
+  };
+}
+
 function serializeOnboarding(user: Awaited<ReturnType<typeof findUserByEmail>>) {
   if (!user) return null;
 
-  const forms = {
-    terms_of_service: Boolean(user.forms_terms_signed_at),
-    work_contract: Boolean(user.forms_work_contract_signed_at),
-    job_description: Boolean(user.forms_job_description_signed_at),
-    pay_terms: Boolean(user.forms_pay_terms_signed_at),
-  };
+  const forms = formsStatus(user);
 
   const allFormsSigned = Object.values(forms).every(Boolean);
+  const trainingCompleted = Boolean(user.training_completed_at);
+  const shadowRequired = toBool(user.shadow_required || 'true');
+  const shadowCompleted = Boolean(user.shadow_completed_at);
+  const clockReady = allFormsSigned && trainingCompleted && (!shadowRequired || shadowCompleted);
+  const completedSteps = [
+    allFormsSigned,
+    trainingCompleted,
+    !shadowRequired || shadowCompleted,
+    clockReady,
+  ].filter(Boolean).length;
+
+  const onboardingStage = !allFormsSigned
+    ? 'forms'
+    : !trainingCompleted
+      ? 'training'
+      : (shadowRequired && !shadowCompleted)
+        ? 'shadow'
+        : 'ready_to_work';
+
   const trackedMinutes = Math.max(0, Number(user.tracked_minutes_total || 0));
 
   return {
@@ -46,9 +69,12 @@ function serializeOnboarding(user: Awaited<ReturnType<typeof findUserByEmail>>) 
     forms_job_description_signed_at: user.forms_job_description_signed_at || '',
     forms_pay_terms_signed_at: user.forms_pay_terms_signed_at || '',
     training_completed_at: user.training_completed_at || '',
-    shadow_required: toBool(user.shadow_required || 'true'),
+    shadow_required: shadowRequired,
     shadow_completed_at: user.shadow_completed_at || '',
     shadow_mentor_email: user.shadow_mentor_email || '',
+    can_clock_in: clockReady,
+    onboarding_stage: onboardingStage,
+    completion_percent: Math.round((completedSteps / 4) * 100),
     clock_in_at: user.clock_in_at || '',
     clock_out_at: user.clock_out_at || '',
     tracked_minutes_total: String(Number.isFinite(trackedMinutes) ? trackedMinutes : 0),
@@ -113,6 +139,12 @@ export async function PATCH(request: NextRequest) {
       };
 
       const targetField = formFieldMap[form];
+      const alreadySigned = Boolean(String(user[targetField] || '').trim());
+      if (alreadySigned) {
+        const refreshed = await findUserByEmail(session.email);
+        return NextResponse.json({ success: true, onboarding: serializeOnboarding(refreshed) });
+      }
+
       const result = await updateUserInSheet(user.email, {
         [targetField]: nowIso,
       });
@@ -123,6 +155,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'complete_training') {
+      const allFormsSigned = Object.values(formsStatus(user)).every(Boolean);
+      if (!allFormsSigned) {
+        return NextResponse.json({ error: 'All required forms must be signed before training can be completed.' }, { status: 400 });
+      }
+
       const result = await updateUserInSheet(user.email, {
         training_completed_at: nowIso,
       });
@@ -137,6 +174,9 @@ export async function PATCH(request: NextRequest) {
       if (!mentorEmail) {
         return NextResponse.json({ error: 'mentor_email is required' }, { status: 400 });
       }
+      if (!/.+@.+\..+/.test(mentorEmail)) {
+        return NextResponse.json({ error: 'mentor_email must be a valid email address' }, { status: 400 });
+      }
 
       const result = await updateUserInSheet(user.email, {
         shadow_mentor_email: mentorEmail,
@@ -148,6 +188,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'complete_shadow') {
+      if (!String(user.training_completed_at || '').trim()) {
+        return NextResponse.json({ error: 'Complete training before marking shadow requirement complete.' }, { status: 400 });
+      }
+
       if (!String(user.shadow_mentor_email || '').trim()) {
         return NextResponse.json({ error: 'Set a shadow mentor before completing shadow training' }, { status: 400 });
       }
@@ -162,6 +206,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'clock_in') {
+      const formsSigned = Object.values(formsStatus(user)).every(Boolean);
+      if (!formsSigned) {
+        return NextResponse.json({ error: 'All required forms must be signed before clock-in.' }, { status: 400 });
+      }
+      if (!String(user.training_completed_at || '').trim()) {
+        return NextResponse.json({ error: 'Training must be completed before clock-in.' }, { status: 400 });
+      }
+
       const shadowRequired = toBool(user.shadow_required || 'true');
       if (shadowRequired && !String(user.shadow_completed_at || '').trim()) {
         return NextResponse.json({ error: 'Shadow training must be completed before solo clock-in.' }, { status: 400 });

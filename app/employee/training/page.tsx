@@ -11,10 +11,19 @@ type SessionUser = {
 };
 
 type OnboardingState = {
+  forms: {
+    terms_of_service: boolean;
+    work_contract: boolean;
+    job_description: boolean;
+    pay_terms: boolean;
+  };
+  all_forms_signed: boolean;
   training_completed_at: string;
   shadow_required: boolean;
   shadow_completed_at: string;
   shadow_mentor_email: string;
+  completion_percent: number;
+  onboarding_stage: 'forms' | 'training' | 'shadow' | 'ready_to_work';
 };
 
 function formatDate(value?: string) {
@@ -150,6 +159,12 @@ export default function EmployeeTrainingPage() {
     return <main className="p-8">Loading training tab...</main>;
   }
 
+  const formsSignedCount = onboarding?.forms ? Object.values(onboarding.forms).filter(Boolean).length : 0;
+  const canCompleteTraining = Boolean(onboarding?.all_forms_signed) && !Boolean(onboarding?.training_completed_at);
+  const canCompleteShadow = Boolean(onboarding?.training_completed_at)
+    && Boolean(String(onboarding?.shadow_mentor_email || '').trim())
+    && !Boolean(onboarding?.shadow_completed_at);
+
   return (
     <main className="min-h-screen bg-gray-50">
       <header className="bg-white border-b shadow-sm">
@@ -188,6 +203,22 @@ export default function EmployeeTrainingPage() {
           </div>
         </div>
 
+        <section className="bg-white rounded-lg shadow p-6 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="text-lg font-bold text-gray-900">Onboarding Sequence</h2>
+            <span className="text-sm font-semibold text-gray-700">{onboarding?.completion_percent ?? 0}% complete</span>
+          </div>
+          <div className="h-3 w-full rounded-full bg-gray-200 overflow-hidden">
+            <div
+              className="h-full bg-indigo-600 transition-all"
+              style={{ width: `${Math.max(0, Math.min(100, onboarding?.completion_percent ?? 0))}%` }}
+            />
+          </div>
+          <p className="text-sm text-gray-600">
+            Stage: {String(onboarding?.onboarding_stage || 'forms').replace(/_/g, ' ')} | Forms signed: {formsSignedCount}/4
+          </p>
+        </section>
+
         <section className="bg-white rounded-lg shadow p-6 space-y-4">
           <h2 className="text-xl font-bold text-gray-900">Training Checklist</h2>
           <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
@@ -199,12 +230,15 @@ export default function EmployeeTrainingPage() {
           <p className="text-xs text-gray-500">Completed at: {formatDate(onboarding?.training_completed_at)}</p>
           <button
             type="button"
-            disabled={Boolean(onboarding?.training_completed_at) || saving === 'training'}
+            disabled={!canCompleteTraining || saving === 'training'}
             onClick={() => void completeTraining()}
             className="px-4 py-2 rounded-md bg-gray-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-60"
           >
             {onboarding?.training_completed_at ? 'Training Completed' : (saving === 'training' ? 'Saving...' : 'Mark Training Complete')}
           </button>
+          {!onboarding?.all_forms_signed && (
+            <p className="text-xs text-amber-700">All required forms must be signed before training can be completed.</p>
+          )}
         </section>
 
         <section className="bg-white rounded-lg shadow p-6 space-y-4">
@@ -237,11 +271,17 @@ export default function EmployeeTrainingPage() {
           <button
             type="button"
             onClick={() => void completeShadow()}
-            disabled={Boolean(onboarding?.shadow_completed_at) || saving === 'shadow'}
+            disabled={!canCompleteShadow || saving === 'shadow'}
             className="px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
           >
             {onboarding?.shadow_completed_at ? 'Shadow Completed' : (saving === 'shadow' ? 'Saving...' : 'Mark Shadow Complete')}
           </button>
+          {!onboarding?.training_completed_at && (
+            <p className="text-xs text-amber-700">Training must be completed before shadow can be marked complete.</p>
+          )}
+          {onboarding?.training_completed_at && !onboarding?.shadow_mentor_email && (
+            <p className="text-xs text-amber-700">Set a mentor before completing shadow requirement.</p>
+          )}
         </section>
 
         {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>}
