@@ -1,10 +1,11 @@
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, unlink, writeFile } from 'fs/promises';
 import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, getRequestIp } from '@/lib/services/rateLimitService';
 import { getSessionFromRequest } from '@/lib/auth/session';
 import {
   addJobApplicationToSheet,
+  deleteJobApplicationFromSheet,
   listJobApplicationsFromSheet,
   updateJobApplicationInSheet,
 } from '@/lib/services/googleSheetsService';
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
       why_work_for_sherbing: whyWork,
       own_equipment: ownEquipment,
       resume_file_name: savedResume.fileName,
-      resume_url: savedResume.url,
+      resume_url: `/api/job-applications/${encodeURIComponent(applicationId)}/resume`,
       resume_mime_type: resumeEntry.type || 'application/octet-stream',
       status: 'new',
     });
@@ -208,6 +209,42 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to update application', details: (error as Error).message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = getSessionFromRequest(request);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const applicationId = normalizeField(body.application_id || null);
+    if (!applicationId) {
+      return NextResponse.json({ error: 'application_id is required' }, { status: 400 });
+    }
+
+    const result = await deleteJobApplicationFromSheet(applicationId);
+    if (!result.success) {
+      return NextResponse.json({ error: result.error || 'Failed to delete application' }, { status: 400 });
+    }
+
+    if (result.resumeFileName) {
+      const resumePath = path.join(process.cwd(), 'public', 'uploads', 'job-applications', result.resumeFileName);
+      try {
+        await unlink(resumePath);
+      } catch {
+        // Ignore missing local files.
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to delete application', details: (error as Error).message },
       { status: 500 }
     );
   }

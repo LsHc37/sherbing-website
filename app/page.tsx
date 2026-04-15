@@ -119,6 +119,8 @@ export default function Home() {
             <Link href="/about" className="hover:text-slate-900">About Us</Link>
             <Link href="/careers" className="hover:text-slate-900">Careers</Link>
             <Link href="/login" className="hover:text-slate-900">Sign In</Link>
+            <Link href="/employee/login" className="hover:text-slate-900">Employee Login</Link>
+            <Link href="/admin/login" className="hover:text-slate-900">Admin Login</Link>
             <Link href="/booking" className="hover:text-slate-900">Book Service</Link>
             <Link href="/signup" className="hover:text-slate-900">Get Started</Link>
           </div>

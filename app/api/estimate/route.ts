@@ -71,12 +71,15 @@ function buildEstimateSummary(
   const includesLawn = payload.service_ids.includes('lawn_mowing');
   if (includesLawn && lawnDurationMinutes) {
     const frequencyLabel = payload.lawn_mowing_frequency === 'bi_weekly' ? 'bi-weekly' : 'weekly';
-    const overgrowthLabel = payload.lawn_initial_overgrowth
-      ? 'includes overgrowth recovery time'
-      : 'has no overgrowth surcharge';
-
+    const addOnsList: string[] = [];
+    if (payload.lawn_initial_overgrowth) addOnsList.push('overgrowth recovery');
+    if (payload.lawn_bag_clippings) addOnsList.push('bagging clippings');
+    if (payload.lawn_heavy_pet_waste) addOnsList.push('pet waste removal');
+    if (payload.lawn_access_blocked) addOnsList.push('site access');
+    
+    const addOnsText = addOnsList.length > 0 ? ` with ${addOnsList.join(', ')}` : '';
     summaryParts.push(
-      `Lawn service is estimated at about ${lawnDurationMinutes} minutes (${frequencyLabel}) and ${overgrowthLabel}, with labor protected at about $45/hour.`
+      `Lawn service (${frequencyLabel}) includes equipment, fuel, and professional expertise${addOnsText}.`
     );
   }
 
@@ -330,7 +333,7 @@ export async function POST(request: NextRequest) {
       `Pricing context and examples: ${JSON.stringify(AI_PRICING_CONTEXT)}`,
       'When historical insights are present for this exact address, prioritize them over generic neighborhood assumptions.',
       'Use nearby comparables from matching ZIP and same street when available to mimic a field walkthrough quote.',
-      'For lawn mowing, protect at least a $45/hour effective rate based on estimated mowing time and service complexity.',
+      'For lawn mowing, prices are competitive and cover all equipment and labor costs.',
       'Infer realistic Boise home/property sizes from the address and apply service complexity and package discount.',
       'Estimated price must be competitive and greater than zero.',
     ].join('\n');

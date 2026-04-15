@@ -66,6 +66,7 @@ export default function EmployeeJobApplicationsPage() {
   const [error, setError] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<'all' | JobApplication['status']>('all');
   const [savingId, setSavingId] = useState('');
+  const [deletingId, setDeletingId] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -154,6 +155,35 @@ export default function EmployeeJobApplicationsPage() {
       await load();
     } finally {
       setSavingId('');
+    }
+  };
+
+  const deleteApplication = async (applicationId: string) => {
+    if (!window.confirm('Delete this application permanently?')) {
+      return;
+    }
+
+    setDeletingId(applicationId);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/job-applications', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: applicationId }),
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(body?.error || 'Unable to delete application');
+        return;
+      }
+
+      setMessage('Application deleted.');
+      await load();
+    } finally {
+      setDeletingId('');
     }
   };
 
@@ -246,7 +276,7 @@ export default function EmployeeJobApplicationsPage() {
                     </div>
                     <p className="text-sm text-gray-600 mt-2">Submitted {formatDateTime(application.created_at)}</p>
                   </div>
-                  <div className="min-w-[220px]">
+                  <div className="min-w-[220px] space-y-3">
                     <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Update status</label>
                     <select
                       value={application.status}
@@ -258,6 +288,16 @@ export default function EmployeeJobApplicationsPage() {
                         <option key={status} value={status}>{status}</option>
                       ))}
                     </select>
+                    {user?.role === 'admin' && (
+                      <button
+                        type="button"
+                        onClick={() => void deleteApplication(application.id)}
+                        disabled={deletingId === application.id}
+                        className="w-full rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {deletingId === application.id ? 'Deleting...' : 'Delete Application'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -277,10 +317,16 @@ export default function EmployeeJobApplicationsPage() {
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wide text-gray-500">Resume</p>
-                    <a href={application.resume_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-emerald-700 font-semibold hover:underline">
+                    <a
+                      href={`/api/job-applications/${encodeURIComponent(application.id)}/resume`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex text-emerald-700 font-semibold hover:underline"
+                    >
                       View resume
                     </a>
                     <p className="mt-2 text-gray-500">{application.resume_file_name}</p>
+                    <p className="text-xs text-gray-500 break-all">{application.resume_url}</p>
                     {application.reviewed_by && <p className="mt-2 text-gray-500">Updated by {application.reviewed_by}</p>}
                     {application.reviewed_at && <p className="text-gray-500">Updated {formatDateTime(application.reviewed_at)}</p>}
                   </div>

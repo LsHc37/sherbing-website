@@ -578,6 +578,36 @@ export async function listJobApplicationsFromSheet() {
   return parseJobApplicationRows(rows);
 }
 
+function normalizeJobApplicationIdentifier(value: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    return decodeURIComponent(raw).trim();
+  } catch {
+    return raw;
+  }
+}
+
+function jobApplicationIdsMatch(left: string, right: string) {
+  return normalizeJobApplicationIdentifier(left).toLowerCase() === normalizeJobApplicationIdentifier(right).toLowerCase();
+}
+
+export async function findJobApplicationById(applicationId: string) {
+  const targetApplicationId = normalizeJobApplicationIdentifier(applicationId);
+  const all = await listJobApplicationsFromSheet();
+  const directMatch = all.find((application) => jobApplicationIdsMatch(application.id, targetApplicationId));
+  if (directMatch) return directMatch;
+
+  const syntheticMatch = /^ROW-(\d+)$/i.exec(targetApplicationId);
+  if (!syntheticMatch) return undefined;
+
+  const rowNumber = Number(syntheticMatch[1]);
+  if (!Number.isFinite(rowNumber)) return undefined;
+
+  return all.find((application) => application.id === `ROW-${rowNumber}`);
+}
+
 export async function addBookingToSheet(booking: BookingForm & { booking_id: string; estimated_price: number }) {
   try {
     const init = await initializeSheet();
@@ -1381,6 +1411,53 @@ export async function updateJobApplicationInSheet(
   }));
 
   return { success: true };
+}
+
+export async function deleteJobApplicationFromSheet(applicationId: string) {
+  const client = await getSheetsClient();
+  if (!client) return { success: false, error: 'Google Sheets not configured' };
+
+  const { sheets, spreadsheetId } = client;
+  const rows = await getTabRows(jobApplicationsTabName());
+  if (rows.length < 2) return { success: false, error: 'No job applications found' };
+
+  const headers = rows[0];
+  const idIdx = headers.indexOf('Application ID');
+  if (idIdx === -1) return { success: false, error: 'Application ID column not found' };
+
+  const targetApplicationId = normalizeJobApplicationIdentifier(applicationId);
+  const rowIndex = rows.findIndex((row, index) => index > 0 && jobApplicationIdsMatch(String(row[idIdx] || ''), targetApplicationId));
+  if (rowIndex === -1) return { success: false, error: 'Job application not found' };
+
+  const row = rows[rowIndex];
+  const resumeFileName = String(row[headers.indexOf('Resume File Name')] || '').trim();
+  const spreadsheetSheetId = await (async () => {
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+    const sheet = (spreadsheet.data.sheets || []).find((item) => item.properties?.title === jobApplicationsTabName());
+    return sheet?.properties?.sheetId;
+  })();
+
+  if (typeof spreadsheetSheetId !== 'number') {
+    return { success: false, error: 'Job applications sheet not found' };
+  }
+
+  await withRetry(() => sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{
+        deleteDimension: {
+          range: {
+            sheetId: spreadsheetSheetId,
+            dimension: 'ROWS',
+            startIndex: rowIndex,
+            endIndex: rowIndex + 1,
+          },
+        },
+      }],
+    },
+  }));
+
+  return { success: true, resumeFileName };
 }
 
 export async function findUserByPasswordResetToken(token: string) {

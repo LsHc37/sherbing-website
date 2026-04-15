@@ -48,7 +48,7 @@ type PackageRule = {
 
 const LAWN_TARGET_HOURLY_RATE = 45;
 const LAWN_BASE_PRODUCTIVITY_SQFT_PER_HOUR = 6200;
-const LAWN_MIN_DURATION_MINUTES = 30;
+const LAWN_MIN_DURATION_MINUTES = 45;
 
 // Boise service area zip codes
 export const BOISE_SERVICE_AREA_ZIP_CODES = [
