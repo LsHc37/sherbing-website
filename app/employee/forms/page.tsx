@@ -37,26 +37,94 @@ type OnboardingState = {
 
 type FormKey = keyof OnboardingState['forms'];
 
-const formConfig: Array<{ key: FormKey; title: string; description: string }> = [
+type DocumentSection = {
+  heading: string;
+  body: string;
+};
+
+type FormDocument = {
+  key: FormKey;
+  title: string;
+  description: string;
+  sections: DocumentSection[];
+};
+
+const formConfig: FormDocument[] = [
   {
     key: 'terms_of_service',
     title: 'Terms of Service',
     description: 'Acknowledge platform standards, client conduct expectations, and communication requirements.',
+    sections: [
+      {
+        heading: 'Platform Use',
+        body: 'Sherbing provides scheduling, dispatching, communication, and payment coordination tools for assigned work opportunities. You agree to use the platform professionally and only for legitimate job-related activity.',
+      },
+      {
+        heading: 'Professional Conduct',
+        body: 'You agree to communicate respectfully with customers, coworkers, and administrators, protect customer privacy, and follow safety instructions and service standards while representing Sherbing.',
+      },
+      {
+        heading: 'Account Responsibility',
+        body: 'You are responsible for protecting your login credentials, keeping your profile information accurate, and promptly reporting any unauthorized access or concerning account activity.',
+      },
+    ],
   },
   {
     key: 'work_contract',
     title: 'Independent Contractor Agreement',
     description: 'Confirm the private contractor relationship and agreement terms for project work.',
+    sections: [
+      {
+        heading: 'Contractor Relationship',
+        body: 'This engagement is structured as an independent contractor relationship. Sherbing coordinates customer demand and appointment booking, while you operate as an independent service provider responsible for delivering assigned work.',
+      },
+      {
+        heading: 'Your Equipment and Methods',
+        body: 'Contractors are expected to bring and use their own equipment, maintain their own tools, and perform work using their own methods consistent with Sherbing requirements, service quality standards, and applicable law.',
+      },
+      {
+        heading: 'Scheduling and Acceptance',
+        body: 'You may accept or decline work opportunities according to your availability and business needs unless otherwise required by a specific work assignment already confirmed through the platform.',
+      },
+    ],
   },
   {
     key: 'job_description',
     title: 'Job Description',
     description: 'Review role expectations, service quality standards, and on-site safety responsibilities.',
+    sections: [
+      {
+        heading: 'Primary Responsibilities',
+        body: 'Complete assigned service appointments on time, communicate clearly with the team, and deliver consistent, high-quality work in the field. Responsibilities may include lawn care, landscaping support, and related customer service duties.',
+      },
+      {
+        heading: 'Work Standards',
+        body: 'Arrive prepared, follow safety practices, handle equipment responsibly, and keep job sites clean and professional. Any issues, delays, or service concerns should be communicated promptly so they can be resolved efficiently.',
+      },
+      {
+        heading: 'Training Requirement',
+        body: 'Before working independently, new contractors must complete the required forms, complete training, and shadow an experienced team member to confirm readiness for solo work.',
+      },
+    ],
   },
   {
     key: 'pay_terms',
     title: 'Pay Terms',
     description: 'Acknowledge payout timing, rate expectations, and billing process details.',
+    sections: [
+      {
+        heading: 'Compensation Overview',
+        body: 'Pay is based on the job structure communicated by Sherbing for the specific assignment. Compensation may vary depending on job type, scope, and complexity of the work performed.',
+      },
+      {
+        heading: 'Payout Timing',
+        body: 'Completed work is reviewed and recorded through the platform so payment can be processed in an organized and timely manner according to the current payout schedule.',
+      },
+      {
+        heading: 'Professional Expectations',
+        body: 'Accurate time tracking, truthful job reporting, and professional communication are required to ensure pay records remain clear, consistent, and compliant.',
+      },
+    ],
   },
 ];
 
@@ -251,6 +319,57 @@ export default function EmployeeFormsPage() {
         </section>
 
         <section className="bg-white rounded-lg shadow p-6 space-y-4">
+          <h2 className="text-xl font-bold text-gray-900">Review Documents Before Signing</h2>
+          <p className="text-sm text-gray-600">
+            Read each agreement in full before you sign. These documents explain the role, expectations, and contractor relationship in plain language.
+          </p>
+
+          <div className="space-y-4">
+            {formConfig.map((formItem) => {
+              const signed = Boolean(onboarding?.forms?.[formItem.key]);
+
+              return (
+                <article key={formItem.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">{formItem.title}</h3>
+                      <p className="mt-1 text-sm text-slate-600">{formItem.description}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${signed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                      {signed ? 'Signed' : 'Pending'}
+                    </span>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 max-h-[22rem] overflow-y-auto space-y-4">
+                    {formItem.sections.map((section) => (
+                      <div key={section.heading}>
+                        <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-800">{section.heading}</h4>
+                        <p className="mt-2 text-sm text-slate-700 leading-7 whitespace-pre-wrap">{section.body}</p>
+                      </div>
+                    ))}
+                    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600">
+                      Please review the entire document before signing. If you have questions, contact the admin team before accepting the agreement.
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-gray-500">Signed at: {formatDate(onboarding?.[`${formItem.key === 'terms_of_service' ? 'forms_terms_signed_at' : formItem.key === 'work_contract' ? 'forms_work_contract_signed_at' : formItem.key === 'job_description' ? 'forms_job_description_signed_at' : 'forms_pay_terms_signed_at'}` as keyof OnboardingState] as string | undefined)}</p>
+                    <button
+                      type="button"
+                      disabled={signed || saving === formItem.key}
+                      onClick={() => void signForm(formItem.key)}
+                      className="px-4 py-2 rounded-md bg-gray-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-60"
+                    >
+                      {signed ? 'Already Signed' : (saving === formItem.key ? 'Signing...' : 'Sign After Review')}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="bg-white rounded-lg shadow p-6 space-y-4">
           <h2 className="text-xl font-bold text-gray-900">Clock In / Clock Out</h2>
           <p className="text-sm text-gray-600">Track shift duration so admin can review productivity, job duration, and labor planning.</p>
 
@@ -291,39 +410,6 @@ export default function EmployeeFormsPage() {
               Clock-in is locked until all required forms are signed, training is complete, and shadow requirements are satisfied.
             </div>
           )}
-        </section>
-
-        <section className="space-y-4">
-          {formConfig.map((formItem) => {
-            const signed = Boolean(onboarding?.forms?.[formItem.key]);
-            const signedAtLookup: Record<FormKey, string | undefined> = {
-              terms_of_service: onboarding?.forms_terms_signed_at,
-              work_contract: onboarding?.forms_work_contract_signed_at,
-              job_description: onboarding?.forms_job_description_signed_at,
-              pay_terms: onboarding?.forms_pay_terms_signed_at,
-            };
-
-            return (
-              <article key={formItem.key} className="bg-white rounded-lg shadow p-6 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h3 className="text-lg font-bold text-gray-900">{formItem.title}</h3>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${signed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                    {signed ? 'Signed' : 'Pending'}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600">{formItem.description}</p>
-                <p className="text-xs text-gray-500">Signed at: {formatDate(signedAtLookup[formItem.key])}</p>
-                <button
-                  type="button"
-                  disabled={signed || saving === formItem.key}
-                  onClick={() => void signForm(formItem.key)}
-                  className="px-4 py-2 rounded-md bg-gray-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-60"
-                >
-                  {signed ? 'Already Signed' : (saving === formItem.key ? 'Signing...' : 'Sign Form')}
-                </button>
-              </article>
-            );
-          })}
         </section>
 
         {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>}
