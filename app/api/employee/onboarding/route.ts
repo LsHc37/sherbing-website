@@ -32,6 +32,10 @@ function formsStatus(user: Awaited<ReturnType<typeof findUserByEmail>>) {
   };
 }
 
+function allRequiredFormsSigned(user: Awaited<ReturnType<typeof findUserByEmail>>) {
+  return Object.values(formsStatus(user)).every(Boolean);
+}
+
 function serializeOnboarding(user: Awaited<ReturnType<typeof findUserByEmail>>) {
   if (!user) return null;
 
@@ -188,6 +192,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'complete_shadow') {
+      const allFormsSigned = allRequiredFormsSigned(user);
+      if (!allFormsSigned) {
+        return NextResponse.json({ error: 'All required forms must be signed before shadow can be completed.' }, { status: 400 });
+      }
+
       if (!String(user.training_completed_at || '').trim()) {
         return NextResponse.json({ error: 'Complete training before marking shadow requirement complete.' }, { status: 400 });
       }
@@ -206,7 +215,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'clock_in') {
-      const formsSigned = Object.values(formsStatus(user)).every(Boolean);
+      const formsSigned = allRequiredFormsSigned(user);
       if (!formsSigned) {
         return NextResponse.json({ error: 'All required forms must be signed before clock-in.' }, { status: 400 });
       }

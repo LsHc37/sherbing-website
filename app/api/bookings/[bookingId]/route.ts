@@ -90,6 +90,14 @@ export async function PATCH(
 
       if (session.role === 'employee') {
         const user = await findUserByEmail(session.email);
+        const formsSigned = Boolean(user?.forms_terms_signed_at)
+          && Boolean(user?.forms_work_contract_signed_at)
+          && Boolean(user?.forms_job_description_signed_at)
+          && Boolean(user?.forms_pay_terms_signed_at);
+        if (!formsSigned) {
+          return NextResponse.json({ error: 'All required forms must be signed before managing bookings.' }, { status: 403 });
+        }
+
         const shadowRequired = String(user?.shadow_required || 'true').toLowerCase() !== 'false';
         const shadowCompleted = Boolean(String(user?.shadow_completed_at || '').trim());
         if (shadowRequired && !shadowCompleted) {
@@ -189,6 +197,14 @@ export async function DELETE(
 
     if (session.role === 'employee') {
       const user = await findUserByEmail(session.email);
+      const formsSigned = Boolean(user?.forms_terms_signed_at)
+        && Boolean(user?.forms_work_contract_signed_at)
+        && Boolean(user?.forms_job_description_signed_at)
+        && Boolean(user?.forms_pay_terms_signed_at);
+      if (!formsSigned) {
+        return NextResponse.json({ error: 'All required forms must be signed before managing bookings.' }, { status: 403 });
+      }
+
       const shadowRequired = String(user?.shadow_required || 'true').toLowerCase() !== 'false';
       const shadowCompleted = Boolean(String(user?.shadow_completed_at || '').trim());
       if (shadowRequired && !shadowCompleted) {

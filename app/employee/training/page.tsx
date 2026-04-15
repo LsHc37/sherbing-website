@@ -162,6 +162,7 @@ export default function EmployeeTrainingPage() {
   const formsSignedCount = onboarding?.forms ? Object.values(onboarding.forms).filter(Boolean).length : 0;
   const canCompleteTraining = Boolean(onboarding?.all_forms_signed) && !Boolean(onboarding?.training_completed_at);
   const canCompleteShadow = Boolean(onboarding?.training_completed_at)
+    && Boolean(onboarding?.all_forms_signed)
     && Boolean(String(onboarding?.shadow_mentor_email || '').trim())
     && !Boolean(onboarding?.shadow_completed_at);
 
@@ -278,6 +279,9 @@ export default function EmployeeTrainingPage() {
           </button>
           {!onboarding?.training_completed_at && (
             <p className="text-xs text-amber-700">Training must be completed before shadow can be marked complete.</p>
+          )}
+          {!onboarding?.all_forms_signed && (
+            <p className="text-xs text-amber-700">All required forms must be signed before shadow can be marked complete.</p>
           )}
           {onboarding?.training_completed_at && !onboarding?.shadow_mentor_email && (
             <p className="text-xs text-amber-700">Set a mentor before completing shadow requirement.</p>
