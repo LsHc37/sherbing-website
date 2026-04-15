@@ -33,7 +33,7 @@ export async function GET(
       return NextResponse.json({ error: 'Resume file not found' }, { status: 404 });
     }
 
-    return new NextResponse(fileBytes, {
+    return new NextResponse(new Uint8Array(fileBytes), {
       status: 200,
       headers: {
         'Content-Type': application.resume_mime_type || 'application/octet-stream',
