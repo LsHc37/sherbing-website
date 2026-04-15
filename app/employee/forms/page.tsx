@@ -128,6 +128,13 @@ const formConfig: FormDocument[] = [
   },
 ];
 
+const signedAtFieldMap: Record<FormKey, keyof Pick<OnboardingState, 'forms_terms_signed_at' | 'forms_work_contract_signed_at' | 'forms_job_description_signed_at' | 'forms_pay_terms_signed_at'>> = {
+  terms_of_service: 'forms_terms_signed_at',
+  work_contract: 'forms_work_contract_signed_at',
+  job_description: 'forms_job_description_signed_at',
+  pay_terms: 'forms_pay_terms_signed_at',
+};
+
 function formatDate(value?: string) {
   if (!value) return 'Not signed';
   const parsed = new Date(value);
@@ -321,12 +328,13 @@ export default function EmployeeFormsPage() {
         <section className="bg-white rounded-lg shadow p-6 space-y-4">
           <h2 className="text-xl font-bold text-gray-900">Review Documents Before Signing</h2>
           <p className="text-sm text-gray-600">
-            Read each agreement in full before you sign. These documents explain the role, expectations, and contractor relationship in plain language.
+            Read each agreement in full before you sign. Use the section links inside each document to jump to specific parts while you review.
           </p>
 
           <div className="space-y-4">
             {formConfig.map((formItem) => {
               const signed = Boolean(onboarding?.forms?.[formItem.key]);
+              const sectionLinks = formItem.sections.map((section) => `#${formItem.key}-${section.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
 
               return (
                 <article key={formItem.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4">
@@ -340,20 +348,32 @@ export default function EmployeeFormsPage() {
                     </span>
                   </div>
 
+                  <div className="flex flex-wrap gap-2">
+                    {formItem.sections.map((section, index) => (
+                      <a
+                        key={section.heading}
+                        href={sectionLinks[index]}
+                        className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                      >
+                        {section.heading}
+                      </a>
+                    ))}
+                  </div>
+
                   <div className="rounded-xl border border-slate-200 bg-white p-4 max-h-[22rem] overflow-y-auto space-y-4">
                     {formItem.sections.map((section) => (
-                      <div key={section.heading}>
+                      <div key={section.heading} id={`${formItem.key}-${section.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}>
                         <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-800">{section.heading}</h4>
                         <p className="mt-2 text-sm text-slate-700 leading-7 whitespace-pre-wrap">{section.body}</p>
                       </div>
                     ))}
                     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600">
-                      Please review the entire document before signing. If you have questions, contact the admin team before accepting the agreement.
+                      Scroll through the full document and use the section links above if you want to jump around while reviewing.
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs text-gray-500">Signed at: {formatDate(onboarding?.[`${formItem.key === 'terms_of_service' ? 'forms_terms_signed_at' : formItem.key === 'work_contract' ? 'forms_work_contract_signed_at' : formItem.key === 'job_description' ? 'forms_job_description_signed_at' : 'forms_pay_terms_signed_at'}` as keyof OnboardingState] as string | undefined)}</p>
+                    <p className="text-xs text-gray-500">Signed at: {formatDate(onboarding?.[signedAtFieldMap[formItem.key]] as string | undefined)}</p>
                     <button
                       type="button"
                       disabled={signed || saving === formItem.key}
