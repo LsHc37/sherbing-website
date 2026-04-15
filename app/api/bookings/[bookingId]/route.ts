@@ -1,4 +1,5 @@
 import { getSessionFromRequest } from '@/lib/auth/session';
+import { findUserByEmail } from '@/lib/services/googleSheetsService';
 import { deleteBookingFromSheet, findBookingById, updateBookingInSheet } from '@/lib/services/googleSheetsService';
 import { isBookingSlotAvailable } from '@/lib/services/googleSheetsService';
 import { NextRequest, NextResponse } from 'next/server';
@@ -88,6 +89,13 @@ export async function PATCH(
       }
 
       if (session.role === 'employee') {
+        const user = await findUserByEmail(session.email);
+        const shadowRequired = String(user?.shadow_required || 'true').toLowerCase() !== 'false';
+        const shadowCompleted = Boolean(String(user?.shadow_completed_at || '').trim());
+        if (shadowRequired && !shadowCompleted) {
+          return NextResponse.json({ error: 'Shadow training must be completed before managing bookings independently.' }, { status: 403 });
+        }
+
         const currentAssignee = String(booking.assigned_employee || '').trim().toLowerCase();
         const isAssignedToEmployee = currentAssignee === session.email.toLowerCase();
         const isUnassigned = !currentAssignee;
@@ -180,6 +188,13 @@ export async function DELETE(
     }
 
     if (session.role === 'employee') {
+      const user = await findUserByEmail(session.email);
+      const shadowRequired = String(user?.shadow_required || 'true').toLowerCase() !== 'false';
+      const shadowCompleted = Boolean(String(user?.shadow_completed_at || '').trim());
+      if (shadowRequired && !shadowCompleted) {
+        return NextResponse.json({ error: 'Shadow training must be completed before managing bookings independently.' }, { status: 403 });
+      }
+
       const assignedEmployee = String(booking.assigned_employee || '').trim().toLowerCase();
       if (assignedEmployee !== session.email.toLowerCase()) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

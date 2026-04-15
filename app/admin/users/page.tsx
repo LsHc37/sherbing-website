@@ -12,6 +12,15 @@ type User = {
   active: string;
   available_dates?: string;
   managed_groups?: string;
+  forms_terms_signed_at?: string;
+  forms_work_contract_signed_at?: string;
+  forms_job_description_signed_at?: string;
+  forms_pay_terms_signed_at?: string;
+  training_completed_at?: string;
+  shadow_required?: string;
+  shadow_completed_at?: string;
+  shadow_mentor_email?: string;
+  tracked_minutes_total?: string;
 };
 
 export default function AdminUsersPage() {
@@ -47,6 +56,28 @@ export default function AdminUsersPage() {
     if (user.role === 'employee' && parseManagedGroups(user.managed_groups).length > 0) return 'Manager';
     if (user.role === 'employee') return 'Employee';
     return 'Customer';
+  };
+
+  const hasAllFormsSigned = (user: User) => {
+    return Boolean(
+      user.forms_terms_signed_at
+      && user.forms_work_contract_signed_at
+      && user.forms_job_description_signed_at
+      && user.forms_pay_terms_signed_at
+    );
+  };
+
+  const formatDate = (value?: string) => {
+    if (!value) return 'Pending';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString();
+  };
+
+  const formatHours = (minutes?: string) => {
+    const raw = Number(minutes || 0);
+    const safe = Number.isFinite(raw) ? raw : 0;
+    return `${(safe / 60).toFixed(2)}h`;
   };
 
   const load = useCallback(async () => {
@@ -252,6 +283,9 @@ export default function AdminUsersPage() {
                 <th className="px-4 py-3 text-left text-sm">Active</th>
                 <th className="px-4 py-3 text-left text-sm">Available Dates</th>
                 <th className="px-4 py-3 text-left text-sm">Manager Groups</th>
+                <th className="px-4 py-3 text-left text-sm">Forms</th>
+                <th className="px-4 py-3 text-left text-sm">Training / Shadow</th>
+                <th className="px-4 py-3 text-left text-sm">Tracked Time</th>
                 <th className="px-4 py-3 text-left text-sm">Actions</th>
               </tr>
             </thead>
@@ -337,6 +371,33 @@ export default function AdminUsersPage() {
                         Save Groups
                       </button>
                       <p className="text-xs text-gray-500">Users with groups can manage interview calls/messages for matching application groups.</p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="min-w-64 space-y-1 text-xs">
+                      <p className={`font-semibold ${hasAllFormsSigned(user) ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        {hasAllFormsSigned(user) ? 'All forms signed' : 'Forms pending'}
+                      </p>
+                      <p>Terms: {formatDate(user.forms_terms_signed_at)}</p>
+                      <p>Contract: {formatDate(user.forms_work_contract_signed_at)}</p>
+                      <p>Job Desc: {formatDate(user.forms_job_description_signed_at)}</p>
+                      <p>Pay Terms: {formatDate(user.forms_pay_terms_signed_at)}</p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="min-w-64 space-y-1 text-xs">
+                      <p>Training: {formatDate(user.training_completed_at)}</p>
+                      <p>Shadow Required: {String(user.shadow_required || 'true') === 'false' ? 'No' : 'Yes'}</p>
+                      <p>Shadow Mentor: {user.shadow_mentor_email || 'Not set'}</p>
+                      <p className={`${user.shadow_completed_at ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}`}>
+                        Shadow Complete: {formatDate(user.shadow_completed_at)}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="min-w-40 space-y-1 text-xs">
+                      <p className="font-semibold text-gray-900">{formatHours(user.tracked_minutes_total)}</p>
+                      <p className="text-gray-500">Total logged work</p>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm">

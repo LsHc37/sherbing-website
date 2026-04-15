@@ -32,6 +32,17 @@ export interface User {
   phone?: string;
   role: 'customer' | 'employee' | 'admin';
   managed_groups?: string[];
+  forms_terms_signed_at?: string;
+  forms_work_contract_signed_at?: string;
+  forms_job_description_signed_at?: string;
+  forms_pay_terms_signed_at?: string;
+  training_completed_at?: string;
+  shadow_required?: string;
+  shadow_completed_at?: string;
+  shadow_mentor_email?: string;
+  clock_in_at?: string;
+  clock_out_at?: string;
+  tracked_minutes_total?: string;
   email_verified: boolean;
   email_verification_code?: string; // Temp code sent via email
   email_verification_expires?: string; // ISO timestamp, usually +10 min from now

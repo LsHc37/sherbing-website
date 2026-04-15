@@ -50,6 +50,17 @@ type UserSheetRow = {
   password_reset_expires?: string;
   available_dates?: string;
   managed_groups?: string;
+  forms_terms_signed_at?: string;
+  forms_work_contract_signed_at?: string;
+  forms_job_description_signed_at?: string;
+  forms_pay_terms_signed_at?: string;
+  training_completed_at?: string;
+  shadow_required?: string;
+  shadow_completed_at?: string;
+  shadow_mentor_email?: string;
+  clock_in_at?: string;
+  clock_out_at?: string;
+  tracked_minutes_total?: string;
 };
 
 type JobApplicationSheetRow = {
@@ -318,6 +329,17 @@ export async function initializeSheet() {
     'Password Reset Expires',
     'Available Dates',
     'Managed Groups',
+    'Forms Terms Signed At',
+    'Forms Work Contract Signed At',
+    'Forms Job Description Signed At',
+    'Forms Pay Terms Signed At',
+    'Training Completed At',
+    'Shadow Required',
+    'Shadow Completed At',
+    'Shadow Mentor Email',
+    'Clock In At',
+    'Clock Out At',
+    'Tracked Minutes Total',
   ];
 
   const jobApplicationHeaders = [
@@ -533,6 +555,17 @@ function parseUserRows(rows: string[][]): UserSheetRow[] {
     password_reset_expires: get(row, 'Password Reset Expires').trim(),
     available_dates: get(row, 'Available Dates').trim(),
     managed_groups: get(row, 'Managed Groups').trim(),
+    forms_terms_signed_at: get(row, 'Forms Terms Signed At').trim(),
+    forms_work_contract_signed_at: get(row, 'Forms Work Contract Signed At').trim(),
+    forms_job_description_signed_at: get(row, 'Forms Job Description Signed At').trim(),
+    forms_pay_terms_signed_at: get(row, 'Forms Pay Terms Signed At').trim(),
+    training_completed_at: get(row, 'Training Completed At').trim(),
+    shadow_required: get(row, 'Shadow Required').trim() || 'true',
+    shadow_completed_at: get(row, 'Shadow Completed At').trim(),
+    shadow_mentor_email: get(row, 'Shadow Mentor Email').trim(),
+    clock_in_at: get(row, 'Clock In At').trim(),
+    clock_out_at: get(row, 'Clock Out At').trim(),
+    tracked_minutes_total: get(row, 'Tracked Minutes Total').trim() || '0',
   }));
 }
 
@@ -1259,7 +1292,7 @@ export async function findUserByEmail(email: string) {
 
 export async function updateUserInSheet(
   email: string,
-  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires' | 'password_reset_token' | 'password_reset_expires' | 'available_dates' | 'managed_groups'>> & { email_verified?: string | boolean }
+  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires' | 'password_reset_token' | 'password_reset_expires' | 'available_dates' | 'managed_groups' | 'forms_terms_signed_at' | 'forms_work_contract_signed_at' | 'forms_job_description_signed_at' | 'forms_pay_terms_signed_at' | 'training_completed_at' | 'shadow_required' | 'shadow_completed_at' | 'shadow_mentor_email' | 'clock_in_at' | 'clock_out_at' | 'tracked_minutes_total'>> & { email_verified?: string | boolean }
 ) {
   const client = await getSheetsClient();
   if (!client) return { success: false, error: 'Google Sheets not configured' };
@@ -1294,6 +1327,17 @@ export async function updateUserInSheet(
   set('Password Reset Expires', updates.password_reset_expires);
   set('Available Dates', updates.available_dates);
   set('Managed Groups', updates.managed_groups);
+  set('Forms Terms Signed At', updates.forms_terms_signed_at);
+  set('Forms Work Contract Signed At', updates.forms_work_contract_signed_at);
+  set('Forms Job Description Signed At', updates.forms_job_description_signed_at);
+  set('Forms Pay Terms Signed At', updates.forms_pay_terms_signed_at);
+  set('Training Completed At', updates.training_completed_at);
+  set('Shadow Required', updates.shadow_required);
+  set('Shadow Completed At', updates.shadow_completed_at);
+  set('Shadow Mentor Email', updates.shadow_mentor_email);
+  set('Clock In At', updates.clock_in_at);
+  set('Clock Out At', updates.clock_out_at);
+  set('Tracked Minutes Total', updates.tracked_minutes_total);
 
   const endColumn = columnNumberToName(headers.length);
   const range = `${usersTabName()}!A${rowIndex + 1}:${endColumn}${rowIndex + 1}`;
@@ -1350,6 +1394,17 @@ export async function createUserInSheet(user: {
         '', // Password Reset Expires
         '', // Available Dates
         '', // Managed Groups
+        '', // Forms Terms Signed At
+        '', // Forms Work Contract Signed At
+        '', // Forms Job Description Signed At
+        '', // Forms Pay Terms Signed At
+        '', // Training Completed At
+        'true', // Shadow Required
+        '', // Shadow Completed At
+        '', // Shadow Mentor Email
+        '', // Clock In At
+        '', // Clock Out At
+        '0', // Tracked Minutes Total
       ]],
     },
   }));

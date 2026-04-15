@@ -584,6 +584,9 @@ export default function EmployeeCalendarPage() {
               Bookings
             </button>
             <Link href="/employee/calendar" className="text-gray-700 hover:text-gray-900 font-semibold">Calendar</Link>
+            <Link href="/employee/forms" className="text-gray-700 hover:text-gray-900">Forms</Link>
+            <Link href="/employee/training" className="text-gray-700 hover:text-gray-900">Training</Link>
+            <Link href="/employee/job-applications" className="text-gray-700 hover:text-gray-900">Job Applications</Link>
             <button onClick={logout} className="text-gray-700 hover:text-gray-900">Logout</button>
           </div>
         </nav>

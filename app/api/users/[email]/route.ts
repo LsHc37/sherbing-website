@@ -28,6 +28,9 @@ export async function PATCH(
       : body.managed_groups === undefined
         ? undefined
         : String(body.managed_groups).trim().toLowerCase();
+    const shadowRequired = body.shadow_required === undefined ? undefined : String(body.shadow_required).trim().toLowerCase() === 'false' ? 'false' : 'true';
+    const shadowMentorEmail = body.shadow_mentor_email === undefined ? undefined : String(body.shadow_mentor_email).trim().toLowerCase();
+    const shadowCompletedAt = body.shadow_completed_at === undefined ? undefined : String(body.shadow_completed_at).trim();
 
     if (role && !['customer', 'employee', 'admin'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
@@ -38,6 +41,9 @@ export async function PATCH(
       active,
       available_dates: availableDates,
       managed_groups: managedGroups,
+      shadow_required: shadowRequired,
+      shadow_mentor_email: shadowMentorEmail,
+      shadow_completed_at: shadowCompletedAt,
     });
 
     if (!result.success) {

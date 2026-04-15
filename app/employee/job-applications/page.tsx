@@ -402,6 +402,8 @@ export default function EmployeeJobApplicationsPage() {
           <div className="flex items-center gap-4 text-sm sm:text-base flex-wrap justify-end">
             <Link href="/employee/dashboard" className="text-gray-700 hover:text-gray-900">Bookings</Link>
             <Link href="/employee/calendar" className="text-gray-700 hover:text-gray-900">Calendar</Link>
+            <Link href="/employee/forms" className="text-gray-700 hover:text-gray-900">Forms</Link>
+            <Link href="/employee/training" className="text-gray-700 hover:text-gray-900">Training</Link>
             {user?.role === 'admin' && <Link href="/admin/users" className="text-gray-700 hover:text-gray-900">Manage Users</Link>}
             {user?.role === 'admin' && <Link href="/admin/booking" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>}
             <button onClick={logout} className="text-gray-700 hover:text-gray-900">Logout</button>

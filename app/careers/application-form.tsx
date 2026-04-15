@@ -159,19 +159,35 @@ export default function CareersApplicationForm() {
         </div>
         <h1 className="mt-5 text-3xl sm:text-4xl font-bold text-slate-900">Join the Sherbing crew</h1>
         <p className="mt-4 text-slate-700 leading-7 max-w-2xl">
-          Thanks for your interest in joining Sherbing.com. Fill out the application below and our team will review it as soon as possible.
+          Thank you for your interest in working with Sherbing.com. Complete the application below and our team will review your background, equipment, and availability.
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
             <p className="text-sm font-semibold text-emerald-900">What we look for</p>
-            <p className="mt-2 text-sm text-emerald-900/80">Reliable transportation, strong communication, and a willingness to work outdoors with the team.</p>
+            <p className="mt-2 text-sm text-emerald-900/80">Professional communication, reliable transportation, and the ability to complete outdoor work safely and consistently.</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
             <p className="text-sm font-semibold text-slate-900">Resume upload</p>
             <p className="mt-2 text-sm text-slate-600">Upload a resume in PDF, DOC, DOCX, TXT, or RTF format.</p>
           </div>
         </div>
+
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white/80 p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">About The Opportunity</p>
+          <h2 className="mt-3 text-xl font-bold text-slate-900">Independent Contractor Position</h2>
+          <div className="mt-4 space-y-3 text-sm text-slate-700 leading-7">
+            <p>
+              This role is structured as an independent contractor opportunity. You operate as your own service professional while partnering with Sherbing for customer demand and scheduling support.
+            </p>
+            <p>
+              Contractors are expected to bring and use their own equipment. Sherbing helps fill your schedule by connecting you with clients and coordinating appointments through the platform.
+            </p>
+            <p>
+              In short, Sherbing acts as the booking and operations partner so you can stay focused on delivering quality work in the field.
+            </p>
+          </div>
+        </section>
 
         {error && (
           <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -345,7 +361,7 @@ export default function CareersApplicationForm() {
           </label>
 
           <label className="space-y-2 text-sm font-medium text-slate-700 block">
-            <span>Sherbing is a private contracting job. Do you have any of your own equipment that you are able and willing to use? If so, please specify. *</span>
+            <span>This is an independent contractor position. What equipment do you own and are willing to use on jobs? *</span>
             <textarea
               value={formData.own_equipment}
               onChange={(event) => updateField('own_equipment', event.target.value)}

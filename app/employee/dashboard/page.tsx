@@ -9,6 +9,8 @@ type User = {
   email: string;
   full_name: string;
   role: 'employee' | 'admin' | 'customer';
+  shadow_required?: string;
+  shadow_completed_at?: string;
 };
 
 type Booking = {
@@ -103,6 +105,7 @@ function includesSearchTerm(booking: Booking, term: string): boolean {
 type BookingCardProps = {
   booking: Booking;
   actionLoading: string | null;
+  canManageActions: boolean;
   onUpdateSchedule: (bookingId: string, scheduledDate: string, scheduledTime: string, scheduledDurationMinutes: number) => Promise<void>;
   onSaveBookingDetails: (bookingId: string, updates: {
     customer_name: string;
@@ -121,7 +124,7 @@ type BookingCardProps = {
   onDeleteBooking: (bookingId: string) => Promise<void>;
 };
 
-function BookingCard({ booking, actionLoading, onUpdateSchedule, onSaveBookingDetails, onDeleteBooking }: BookingCardProps) {
+function BookingCard({ booking, actionLoading, canManageActions, onUpdateSchedule, onSaveBookingDetails, onDeleteBooking }: BookingCardProps) {
   const services = parseServices(booking.service_id);
   const [scheduledDateDraft, setScheduledDateDraft] = useState(booking.scheduled_date || '');
   const [scheduledTimeDraft, setScheduledTimeDraft] = useState(booking.scheduled_time || '');
@@ -202,7 +205,7 @@ function BookingCard({ booking, actionLoading, onUpdateSchedule, onSaveBookingDe
             </select>
             <button
               onClick={() => void onUpdateSchedule(booking.id, scheduledDateDraft, scheduledTimeDraft, scheduledDurationDraft)}
-              disabled={actionLoading === booking.id + 'schedule'}
+              disabled={!canManageActions || actionLoading === booking.id + 'schedule'}
               className="px-3 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-50"
             >
               {actionLoading === booking.id + 'schedule' ? 'Saving...' : 'Save Schedule'}
@@ -311,7 +314,7 @@ function BookingCard({ booking, actionLoading, onUpdateSchedule, onSaveBookingDe
                 state: stateDraft,
                 zip_code: zipCodeDraft,
               })}
-              disabled={actionLoading === booking.id + 'details'}
+              disabled={!canManageActions || actionLoading === booking.id + 'details'}
               className="px-3 py-2 bg-slate-800 text-white text-sm rounded-md hover:bg-black disabled:opacity-50"
             >
               {actionLoading === booking.id + 'details' ? 'Saving...' : 'Save Booking Details'}
@@ -321,12 +324,18 @@ function BookingCard({ booking, actionLoading, onUpdateSchedule, onSaveBookingDe
           <div>
             <button
               onClick={() => void onDeleteBooking(booking.id)}
-              disabled={actionLoading === booking.id + 'delete'}
+              disabled={!canManageActions || actionLoading === booking.id + 'delete'}
               className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded-md hover:bg-red-200 disabled:opacity-50"
             >
               {actionLoading === booking.id + 'delete' ? 'Deleting...' : 'Delete Booking'}
             </button>
           </div>
+
+          {!canManageActions && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Action locked until required shadow training is completed. Go to Training tab to complete onboarding.
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2">
             <a
@@ -434,6 +443,14 @@ export default function EmployeeDashboardPage() {
   const quotedTotal = useMemo(() => {
     return bookings.reduce((sum, booking) => sum + Number(booking.customer_price || booking.estimated_price || 0), 0);
   }, [bookings]);
+
+  const canWorkSolo = useMemo(() => {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    const shadowRequired = String(user.shadow_required || 'true').toLowerCase() !== 'false';
+    if (!shadowRequired) return true;
+    return Boolean(String(user.shadow_completed_at || '').trim());
+  }, [user]);
 
   const updateSchedule = async (bookingId: string, scheduledDate: string, scheduledTime: string, scheduledDurationMinutes: number): Promise<void> => {
     setActionLoading(bookingId + 'schedule');
@@ -600,6 +617,18 @@ export default function EmployeeDashboardPage() {
               Calendar
             </button>
             <button
+              onClick={() => router.push('/employee/forms')}
+              className="text-gray-700 hover:text-gray-900"
+            >
+              Forms
+            </button>
+            <button
+              onClick={() => router.push('/employee/training')}
+              className="text-gray-700 hover:text-gray-900"
+            >
+              Training
+            </button>
+            <button
               onClick={() => router.push('/employee/job-applications')}
               className="text-gray-700 hover:text-gray-900"
             >
@@ -647,6 +676,15 @@ export default function EmployeeDashboardPage() {
           </button>
         </div>
 
+        {!canWorkSolo && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
+            Solo work actions are locked until shadow training is complete. Finish your training in the
+            {' '}
+            <Link href="/employee/training" className="font-semibold underline">Training tab</Link>
+            .
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>
         )}
@@ -669,6 +707,7 @@ export default function EmployeeDashboardPage() {
                   key={`${booking.id}-${booking.scheduled_date || ''}-${booking.scheduled_time || ''}`}
                   booking={booking}
                   actionLoading={actionLoading}
+                  canManageActions={canWorkSolo}
                   onUpdateSchedule={updateSchedule}
                   onSaveBookingDetails={saveBookingDetails}
                   onDeleteBooking={deleteBooking}

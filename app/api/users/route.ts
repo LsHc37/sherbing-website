@@ -19,6 +19,17 @@ export async function GET(request: NextRequest) {
       active: user.active,
       available_dates: user.available_dates || '',
       managed_groups: user.managed_groups || '',
+      forms_terms_signed_at: user.forms_terms_signed_at || '',
+      forms_work_contract_signed_at: user.forms_work_contract_signed_at || '',
+      forms_job_description_signed_at: user.forms_job_description_signed_at || '',
+      forms_pay_terms_signed_at: user.forms_pay_terms_signed_at || '',
+      training_completed_at: user.training_completed_at || '',
+      shadow_required: user.shadow_required || 'true',
+      shadow_completed_at: user.shadow_completed_at || '',
+      shadow_mentor_email: user.shadow_mentor_email || '',
+      clock_in_at: user.clock_in_at || '',
+      clock_out_at: user.clock_out_at || '',
+      tracked_minutes_total: user.tracked_minutes_total || '0',
     }));
 
     return NextResponse.json(safeUsers);

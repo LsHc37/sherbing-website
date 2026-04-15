@@ -22,12 +22,43 @@ function randomId() {
   return `p-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function buildIceServers(): RTCIceServer[] {
+  const iceServers: RTCIceServer[] = [];
+  const stunUrls = String(process.env.NEXT_PUBLIC_WEBRTC_STUN_URLS || 'stun:stun.l.google.com:19302')
+    .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean);
+
+  if (stunUrls.length > 0) {
+    iceServers.push({ urls: stunUrls });
+  }
+
+  const turnUrls = String(process.env.NEXT_PUBLIC_WEBRTC_TURN_URLS || '')
+    .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean);
+  const turnUsername = String(process.env.NEXT_PUBLIC_WEBRTC_TURN_USERNAME || '').trim();
+  const turnCredential = String(process.env.NEXT_PUBLIC_WEBRTC_TURN_CREDENTIAL || '').trim();
+
+  if (turnUrls.length > 0 && turnUsername && turnCredential) {
+    iceServers.push({
+      urls: turnUrls,
+      username: turnUsername,
+      credential: turnCredential,
+    });
+  }
+
+  return iceServers;
+}
+
 export default function InterviewCallPage({ params }: { params: Promise<{ roomId: string }> }) {
   const [roomId, setRoomId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [joined, setJoined] = useState(false);
   const [status, setStatus] = useState('Waiting to join call...');
   const [participants, setParticipants] = useState<CallParticipant[]>([]);
+  const [peerState, setPeerState] = useState('idle');
+  const [iceState, setIceState] = useState('idle');
   const [isMuted, setIsMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
@@ -69,7 +100,7 @@ export default function InterviewCallPage({ params }: { params: Promise<{ roomId
     if (peerRef.current) return peerRef.current;
 
     const peer = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceServers: buildIceServers(),
     });
 
     peer.onnegotiationneeded = async () => {
@@ -102,6 +133,28 @@ export default function InterviewCallPage({ params }: { params: Promise<{ roomId
       if (!remoteVideoRef.current) return;
       remoteVideoRef.current.srcObject = event.streams[0];
       setStatus('Connected');
+    };
+
+    peer.onconnectionstatechange = () => {
+      setPeerState(peer.connectionState);
+      if (peer.connectionState === 'connected') {
+        setStatus('Connected');
+      } else if (peer.connectionState === 'connecting') {
+        setStatus('Connecting media...');
+      } else if (peer.connectionState === 'failed') {
+        setStatus('Connection failed. Check camera/mic permissions and network access.');
+      }
+    };
+
+    peer.oniceconnectionstatechange = () => {
+      setIceState(peer.iceConnectionState);
+      if (peer.iceConnectionState === 'connected' || peer.iceConnectionState === 'completed') {
+        setStatus('Connected');
+      } else if (peer.iceConnectionState === 'checking') {
+        setStatus('Checking network path...');
+      } else if (peer.iceConnectionState === 'failed') {
+        setStatus('ICE failed. This usually means a network/NAT issue or missing TURN relay.');
+      }
     };
 
     if (localStreamRef.current) {
@@ -201,6 +254,8 @@ export default function InterviewCallPage({ params }: { params: Promise<{ roomId
         localVideoRef.current.srcObject = stream;
       }
 
+      ensurePeer();
+
       const supabase = createClient();
       const channel = supabase.channel(`interview-room-${roomId}`, {
         config: {
@@ -240,6 +295,7 @@ export default function InterviewCallPage({ params }: { params: Promise<{ roomId
       channelRef.current = channel;
       setJoined(true);
       setStatus('Joined. Waiting for the other participant...');
+      updateParticipantsFromPresence();
     } catch {
       setStatus('Camera/Mic permission is required to join the call.');
     }
@@ -316,6 +372,7 @@ export default function InterviewCallPage({ params }: { params: Promise<{ roomId
         <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 space-y-3">
           <p className="text-sm text-gray-300">Room: <span className="font-mono text-gray-100">{roomId}</span></p>
           <p className="text-sm text-gray-300">Status: {status}</p>
+          <p className="text-xs text-gray-400">Peer state: {peerState} | ICE state: {iceState}</p>
           <p className="text-sm text-gray-300">Participants in room: {participants.length}</p>
 
           <div className="flex flex-wrap items-center gap-2">
