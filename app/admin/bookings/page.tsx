@@ -183,6 +183,8 @@ export default function AdminBookingsPage() {
           </div>
           <div className="flex items-center gap-4 text-sm">
             <Link href="/admin/users" className="text-gray-700 hover:text-gray-900">Manage Users</Link>
+            <Link href="/admin/routes" className="text-gray-700 hover:text-gray-900">Route Planner</Link>
+            <Link href="/admin/timesheet" className="text-gray-700 hover:text-gray-900">Timesheets</Link>
             <Link href="/employee/dashboard" className="text-gray-700 hover:text-gray-900">Dashboard</Link>
           </div>
         </div>

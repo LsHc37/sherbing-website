@@ -21,6 +21,10 @@ type User = {
   shadow_completed_at?: string;
   shadow_mentor_email?: string;
   tracked_minutes_total?: string;
+  route_role?: string;
+  pay_type?: string;
+  pay_rate?: string;
+  job_description?: string;
 };
 
 export default function AdminUsersPage() {
@@ -30,6 +34,10 @@ export default function AdminUsersPage() {
   const [availabilityDrafts, setAvailabilityDrafts] = useState<Record<string, string[]>>({});
   const [availabilityInputs, setAvailabilityInputs] = useState<Record<string, string>>({});
   const [managedGroupDrafts, setManagedGroupDrafts] = useState<Record<string, string>>({});
+  const [routeRoleDrafts, setRouteRoleDrafts] = useState<Record<string, string>>({});
+  const [payTypeDrafts, setPayTypeDrafts] = useState<Record<string, string>>({});
+  const [payRateDrafts, setPayRateDrafts] = useState<Record<string, string>>({});
+  const [jobDescriptionDrafts, setJobDescriptionDrafts] = useState<Record<string, string>>({});
   const [inviteData, setInviteData] = useState({
     full_name: '',
     email: '',
@@ -113,10 +121,22 @@ export default function AdminUsersPage() {
     }
     setAvailabilityDrafts(nextDrafts);
     const nextManagedGroups: Record<string, string> = {};
+    const nextRouteRoleDrafts: Record<string, string> = {};
+    const nextPayTypeDrafts: Record<string, string> = {};
+    const nextPayRateDrafts: Record<string, string> = {};
+    const nextJobDescriptionDrafts: Record<string, string> = {};
     for (const user of loadedUsers as User[]) {
       nextManagedGroups[user.email] = String(user.managed_groups || '');
+      nextRouteRoleDrafts[user.email] = String(user.route_role || '');
+      nextPayTypeDrafts[user.email] = String(user.pay_type || '');
+      nextPayRateDrafts[user.email] = String(user.pay_rate || '');
+      nextJobDescriptionDrafts[user.email] = String(user.job_description || '');
     }
     setManagedGroupDrafts(nextManagedGroups);
+    setRouteRoleDrafts(nextRouteRoleDrafts);
+    setPayTypeDrafts(nextPayTypeDrafts);
+    setPayRateDrafts(nextPayRateDrafts);
+    setJobDescriptionDrafts(nextJobDescriptionDrafts);
 
     setLoading(false);
   }, []);
@@ -129,7 +149,7 @@ export default function AdminUsersPage() {
     return () => clearTimeout(timer);
   }, [load]);
 
-  const updateUser = async (email: string, payload: { role?: User['role']; active?: string; available_dates?: string; managed_groups?: string }) => {
+  const updateUser = async (email: string, payload: { role?: User['role']; active?: string; available_dates?: string; managed_groups?: string; route_role?: string; pay_type?: string; pay_rate?: string; job_description?: string }) => {
     const response = await fetch(`/api/users/${encodeURIComponent(email)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -156,6 +176,15 @@ export default function AdminUsersPage() {
 
   const setManagedGroups = async (email: string, managed_groups: string) => {
     await updateUser(email, { managed_groups });
+  };
+
+  const saveEmploymentProfile = async (email: string) => {
+    await updateUser(email, {
+      route_role: routeRoleDrafts[email] || '',
+      pay_type: payTypeDrafts[email] || '',
+      pay_rate: payRateDrafts[email] || '',
+      job_description: jobDescriptionDrafts[email] || '',
+    });
   };
 
   const addAvailabilityDate = (email: string) => {
@@ -227,6 +256,8 @@ export default function AdminUsersPage() {
           </div>
           <div className="flex items-center gap-4">
             <Link href="/admin/booking" className="text-gray-700 hover:text-gray-900">Manage Bookings</Link>
+            <Link href="/admin/routes" className="text-gray-700 hover:text-gray-900">Route Planner</Link>
+            <Link href="/admin/timesheet" className="text-gray-700 hover:text-gray-900">Timesheets</Link>
             <Link href="/employee/job-applications" className="text-gray-700 hover:text-gray-900">Job Applications</Link>
             <Link href="/employee/dashboard" className="text-gray-700 hover:text-gray-900">Back to Dashboard</Link>
           </div>
@@ -286,6 +317,7 @@ export default function AdminUsersPage() {
                 <th className="px-4 py-3 text-left text-sm">Forms</th>
                 <th className="px-4 py-3 text-left text-sm">Training / Shadow</th>
                 <th className="px-4 py-3 text-left text-sm">Tracked Time</th>
+                <th className="px-4 py-3 text-left text-sm">Route &amp; Pay Profile</th>
                 <th className="px-4 py-3 text-left text-sm">Actions</th>
               </tr>
             </thead>
@@ -398,6 +430,63 @@ export default function AdminUsersPage() {
                     <div className="min-w-40 space-y-1 text-xs">
                       <p className="font-semibold text-gray-900">{formatHours(user.tracked_minutes_total)}</p>
                       <p className="text-gray-500">Total logged work</p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="min-w-80 space-y-2">
+                      <input
+                        type="text"
+                        value={routeRoleDrafts[user.email] || ''}
+                        onChange={(e) => setRouteRoleDrafts((prev) => ({
+                          ...prev,
+                          [user.email]: e.target.value,
+                        }))}
+                        className="w-full px-2 py-1 border rounded"
+                        placeholder="Route role (lead driver, helper)"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={payTypeDrafts[user.email] || ''}
+                          onChange={(e) => setPayTypeDrafts((prev) => ({
+                            ...prev,
+                            [user.email]: e.target.value,
+                          }))}
+                          className="px-2 py-1 border rounded"
+                        >
+                          <option value="">Pay type</option>
+                          <option value="hourly">Hourly</option>
+                          <option value="daily">Daily</option>
+                          <option value="per_route">Per Route</option>
+                          <option value="commission">Commission</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={payRateDrafts[user.email] || ''}
+                          onChange={(e) => setPayRateDrafts((prev) => ({
+                            ...prev,
+                            [user.email]: e.target.value,
+                          }))}
+                          className="px-2 py-1 border rounded"
+                          placeholder="Pay rate (e.g. 22.50)"
+                        />
+                      </div>
+                      <textarea
+                        value={jobDescriptionDrafts[user.email] || ''}
+                        onChange={(e) => setJobDescriptionDrafts((prev) => ({
+                          ...prev,
+                          [user.email]: e.target.value,
+                        }))}
+                        className="w-full px-2 py-1 border rounded"
+                        rows={3}
+                        placeholder="Job description / responsibilities"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void saveEmploymentProfile(user.email)}
+                        className="px-2 py-1 bg-emerald-600 text-white rounded"
+                      >
+                        Save Profile
+                      </button>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm">

@@ -149,6 +149,13 @@ export default function EmployeeFormsPage() {
   const [saving, setSaving] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [viewerFormKey, setViewerFormKey] = useState<FormKey | null>(null);
+  const [reviewedForms, setReviewedForms] = useState<Record<FormKey, boolean>>({
+    terms_of_service: false,
+    work_contract: false,
+    job_description: false,
+    pay_terms: false,
+  });
 
   const loadData = async () => {
     setLoading(true);
@@ -266,6 +273,77 @@ export default function EmployeeFormsPage() {
     if (!onboarding?.forms) return 0;
     return Object.values(onboarding.forms).filter(Boolean).length;
   }, [onboarding?.forms]);
+  const viewerDocument = useMemo(
+    () => formConfig.find((item) => item.key === viewerFormKey) || null,
+    [viewerFormKey]
+  );
+
+  const closeViewer = () => {
+    setViewerFormKey(null);
+  };
+
+  const openViewer = (formKey: FormKey) => {
+    setViewerFormKey(formKey);
+    setReviewedForms((previous) => ({
+      ...previous,
+      [formKey]: true,
+    }));
+  };
+
+  const printDocument = () => {
+    if (!viewerDocument) return;
+
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>${viewerDocument.title}</title>
+    <style>
+      body { font-family: Georgia, 'Times New Roman', serif; margin: 32px; color: #111827; }
+      h1 { margin-bottom: 8px; }
+      h2 { margin-top: 24px; margin-bottom: 8px; font-size: 18px; }
+      p { line-height: 1.6; margin: 0 0 12px; }
+      .meta { color: #4b5563; margin-bottom: 18px; }
+    </style>
+  </head>
+  <body>
+    <h1>${viewerDocument.title}</h1>
+    <p class="meta">${viewerDocument.description}</p>
+    ${viewerDocument.sections.map((section) => `<h2>${section.heading}</h2><p>${section.body}</p>`).join('')}
+  </body>
+</html>`;
+
+    const popup = window.open('', '_blank', 'noopener,noreferrer,width=900,height=900');
+    if (!popup) {
+      setError('Pop-up blocked. Allow pop-ups to print this document.');
+      return;
+    }
+
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+    popup.print();
+  };
+
+  const downloadDocument = () => {
+    if (!viewerDocument) return;
+
+    const content = [
+      viewerDocument.title,
+      viewerDocument.description,
+      '',
+      ...viewerDocument.sections.flatMap((section) => [section.heading, section.body, '']),
+    ].join('\n');
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${viewerDocument.key}.txt`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   if (loading) {
     return <main className="p-8">Loading forms and compliance...</main>;
@@ -374,15 +452,29 @@ export default function EmployeeFormsPage() {
 
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs text-gray-500">Signed at: {formatDate(onboarding?.[signedAtFieldMap[formItem.key]] as string | undefined)}</p>
-                    <button
-                      type="button"
-                      disabled={signed || saving === formItem.key}
-                      onClick={() => void signForm(formItem.key)}
-                      className="px-4 py-2 rounded-md bg-gray-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-60"
-                    >
-                      {signed ? 'Already Signed' : (saving === formItem.key ? 'Signing...' : 'Sign After Review')}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openViewer(formItem.key)}
+                        className="px-4 py-2 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-800 hover:bg-slate-100"
+                      >
+                        Open Full-Screen Viewer
+                      </button>
+                      <button
+                        type="button"
+                        disabled={signed || saving === formItem.key || !reviewedForms[formItem.key]}
+                        onClick={() => void signForm(formItem.key)}
+                        className="px-4 py-2 rounded-md bg-gray-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-60"
+                      >
+                        {signed ? 'Already Signed' : (saving === formItem.key ? 'Signing...' : 'Sign After Review')}
+                      </button>
+                    </div>
                   </div>
+                  {!signed && !reviewedForms[formItem.key] && (
+                    <p className="text-xs text-amber-700">
+                      Open the full-screen viewer once to unlock signing for this document.
+                    </p>
+                  )}
                 </article>
               );
             })}
@@ -435,6 +527,69 @@ export default function EmployeeFormsPage() {
         {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>}
         {message && <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700">{message}</div>}
       </div>
+
+      {viewerDocument && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm p-3 sm:p-6">
+          <div className="mx-auto h-full w-full max-w-6xl rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden">
+            <div className="border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900">{viewerDocument.title}</h2>
+                <p className="mt-1 text-sm text-slate-600">{viewerDocument.description}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeViewer}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="border-b border-slate-200 px-4 py-3 sm:px-6 flex flex-wrap items-center gap-2">
+              {viewerDocument.sections.map((section) => {
+                const sectionId = `${viewerDocument.key}-viewer-${section.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+                return (
+                  <a
+                    key={section.heading}
+                    href={`#${sectionId}`}
+                    className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    {section.heading}
+                  </a>
+                );
+              })}
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={downloadDocument}
+                  className="rounded-md bg-slate-200 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-300"
+                >
+                  Download
+                </button>
+                <button
+                  type="button"
+                  onClick={printDocument}
+                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-black"
+                >
+                  Print
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-8 sm:py-6 space-y-6">
+              {viewerDocument.sections.map((section) => {
+                const sectionId = `${viewerDocument.key}-viewer-${section.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+                return (
+                  <section key={section.heading} id={sectionId} className="space-y-2">
+                    <h3 className="text-base sm:text-lg font-bold uppercase tracking-wide text-slate-900">{section.heading}</h3>
+                    <p className="text-sm sm:text-base leading-7 text-slate-800 whitespace-pre-wrap">{section.body}</p>
+                  </section>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

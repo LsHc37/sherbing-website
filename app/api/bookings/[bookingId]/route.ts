@@ -68,6 +68,15 @@ export async function PATCH(
       const scheduledDurationMinutes = body.scheduled_duration_minutes !== undefined
         ? Number(body.scheduled_duration_minutes)
         : undefined;
+      const routeName = body.route_name !== undefined ? String(body.route_name).trim() : undefined;
+      const routeStopOrder = body.route_stop_order !== undefined
+        ? Number(body.route_stop_order)
+        : undefined;
+      const routeEstimatedTravelMinutes = body.route_estimated_travel_minutes !== undefined
+        ? Number(body.route_estimated_travel_minutes)
+        : undefined;
+      const routeAiSummary = body.route_ai_summary !== undefined ? String(body.route_ai_summary).trim() : undefined;
+      const routeGroupId = body.route_group_id !== undefined ? String(body.route_group_id).trim() : undefined;
       const normalizedScheduledDurationMinutes = Number.isFinite(scheduledDurationMinutes)
         ? Math.max(30, Math.min(480, Math.round(Number(scheduledDurationMinutes) / 15) * 15))
         : undefined;
@@ -143,6 +152,13 @@ export async function PATCH(
         status,
         notes,
         assigned_employee: resolvedAssignedEmployee,
+        route_name: routeName,
+        route_stop_order: Number.isFinite(routeStopOrder) ? String(Math.max(0, Math.floor(Number(routeStopOrder)))) : undefined,
+        route_estimated_travel_minutes: Number.isFinite(routeEstimatedTravelMinutes)
+          ? String(Math.max(0, Math.round(Number(routeEstimatedTravelMinutes))))
+          : undefined,
+        route_ai_summary: routeAiSummary,
+        route_group_id: routeGroupId,
         scheduled_date: scheduledDate,
         scheduled_time: scheduledTime,
         scheduled_duration_minutes: Number.isFinite(normalizedScheduledDurationMinutes) ? String(normalizedScheduledDurationMinutes) : undefined,

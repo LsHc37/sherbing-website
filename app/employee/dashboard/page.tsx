@@ -623,6 +623,12 @@ export default function EmployeeDashboardPage() {
               Forms
             </button>
             <button
+              onClick={() => router.push('/employee/timesheet')}
+              className="text-gray-700 hover:text-gray-900"
+            >
+              Timesheet
+            </button>
+            <button
               onClick={() => router.push('/employee/training')}
               className="text-gray-700 hover:text-gray-900"
             >

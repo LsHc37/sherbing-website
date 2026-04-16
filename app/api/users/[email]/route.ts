@@ -31,6 +31,10 @@ export async function PATCH(
     const shadowRequired = body.shadow_required === undefined ? undefined : String(body.shadow_required).trim().toLowerCase() === 'false' ? 'false' : 'true';
     const shadowMentorEmail = body.shadow_mentor_email === undefined ? undefined : String(body.shadow_mentor_email).trim().toLowerCase();
     const shadowCompletedAt = body.shadow_completed_at === undefined ? undefined : String(body.shadow_completed_at).trim();
+    const routeRole = body.route_role === undefined ? undefined : String(body.route_role).trim();
+    const payType = body.pay_type === undefined ? undefined : String(body.pay_type).trim();
+    const payRate = body.pay_rate === undefined ? undefined : String(body.pay_rate).trim();
+    const jobDescription = body.job_description === undefined ? undefined : String(body.job_description).trim();
 
     if (role && !['customer', 'employee', 'admin'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
@@ -44,6 +48,10 @@ export async function PATCH(
       shadow_required: shadowRequired,
       shadow_mentor_email: shadowMentorEmail,
       shadow_completed_at: shadowCompletedAt,
+      route_role: routeRole,
+      pay_type: payType,
+      pay_rate: payRate,
+      job_description: jobDescription,
     });
 
     if (!result.success) {

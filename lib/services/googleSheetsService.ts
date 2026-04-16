@@ -31,6 +31,11 @@ type BookingSheetRow = {
   notes: string;
   status: string;
   assigned_employee: string;
+  route_name?: string;
+  route_stop_order?: string;
+  route_estimated_travel_minutes?: string;
+  route_ai_summary?: string;
+  route_group_id?: string;
   customer_update_request: string;
   timestamp: string;
 };
@@ -61,6 +66,10 @@ type UserSheetRow = {
   clock_in_at?: string;
   clock_out_at?: string;
   tracked_minutes_total?: string;
+  route_role?: string;
+  pay_type?: string;
+  pay_rate?: string;
+  job_description?: string;
 };
 
 type JobApplicationSheetRow = {
@@ -92,6 +101,33 @@ type JobApplicationSheetRow = {
   reviewed_at?: string;
 };
 
+type TimesheetSheetRow = {
+  created_at: string;
+  entry_id: string;
+  employee_email: string;
+  clock_in_at: string;
+  clock_out_at: string;
+  minutes_worked: string;
+  source: string;
+  status: string;
+  approved_by?: string;
+  approved_at?: string;
+  notes?: string;
+};
+
+type TimesheetAdjustmentSheetRow = {
+  created_at: string;
+  request_id: string;
+  employee_email: string;
+  target_date: string;
+  minutes_delta: string;
+  reason: string;
+  status: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  review_notes?: string;
+};
+
 const authConfig: JWTInput = {
   type: 'service_account',
   project_id: 'sherbing-booking',
@@ -104,6 +140,8 @@ const authConfig: JWTInput = {
 const bookingsTabName = () => process.env.GOOGLE_SHEETS_TAB_NAME || 'Bookings';
 const usersTabName = () => process.env.GOOGLE_USERS_TAB_NAME || 'Users';
 const jobApplicationsTabName = () => process.env.GOOGLE_JOB_APPLICATIONS_TAB_NAME || 'Job Applications';
+const timesheetTabName = () => process.env.GOOGLE_TIMESHEET_TAB_NAME || 'Timesheets';
+const timesheetAdjustmentsTabName = () => process.env.GOOGLE_TIMESHEET_ADJUSTMENTS_TAB_NAME || 'Timesheet Adjustments';
 
 type SheetsClient = {
   sheets: ReturnType<typeof google.sheets>;
@@ -310,6 +348,11 @@ export async function initializeSheet() {
     'Notes',
     'Status',
     'Assigned Employee',
+    'Route Name',
+    'Route Stop Order',
+    'Route Estimated Travel Minutes',
+    'Route AI Summary',
+    'Route Group ID',
     'Customer Update Request',
     'Scheduled Duration Minutes',
   ];
@@ -340,6 +383,10 @@ export async function initializeSheet() {
     'Clock In At',
     'Clock Out At',
     'Tracked Minutes Total',
+    'Route Role',
+    'Pay Type',
+    'Pay Rate',
+    'Job Description',
   ];
 
   const jobApplicationHeaders = [
@@ -371,13 +418,46 @@ export async function initializeSheet() {
     'Reviewed At',
   ];
 
+  const timesheetHeaders = [
+    'Created At',
+    'Entry ID',
+    'Employee Email',
+    'Clock In At',
+    'Clock Out At',
+    'Minutes Worked',
+    'Source',
+    'Status',
+    'Approved By',
+    'Approved At',
+    'Notes',
+  ];
+
+  const timesheetAdjustmentHeaders = [
+    'Created At',
+    'Request ID',
+    'Employee Email',
+    'Target Date',
+    'Minutes Delta',
+    'Reason',
+    'Status',
+    'Reviewed By',
+    'Reviewed At',
+    'Review Notes',
+  ];
+
   const bookingInit = await ensureHeaders(bookingsTabName(), bookingHeaders);
   if (!bookingInit.success) return bookingInit;
 
   const usersInit = await ensureHeaders(usersTabName(), userHeaders);
   if (!usersInit.success) return usersInit;
 
-  return ensureHeaders(jobApplicationsTabName(), jobApplicationHeaders);
+  const jobApplicationInit = await ensureHeaders(jobApplicationsTabName(), jobApplicationHeaders);
+  if (!jobApplicationInit.success) return jobApplicationInit;
+
+  const timesheetInit = await ensureHeaders(timesheetTabName(), timesheetHeaders);
+  if (!timesheetInit.success) return timesheetInit;
+
+  return ensureHeaders(timesheetAdjustmentsTabName(), timesheetAdjustmentHeaders);
 }
 
 function parseBookingRows(rows: string[][]): BookingSheetRow[] {
@@ -450,6 +530,11 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       notes: getByAliases(row, ['Notes', 'notes']),
       status: getByAliases(row, ['Status', 'status']) || 'pending',
       assigned_employee: getByAliases(row, ['Assigned Employee', 'assigned_employee']),
+      route_name: getByAliases(row, ['Route Name', 'route_name']),
+      route_stop_order: getByAliases(row, ['Route Stop Order', 'route_stop_order', 'stop_order']),
+      route_estimated_travel_minutes: getByAliases(row, ['Route Estimated Travel Minutes', 'route_estimated_travel_minutes', 'travel_minutes']),
+      route_ai_summary: getByAliases(row, ['Route AI Summary', 'route_ai_summary']),
+      route_group_id: getByAliases(row, ['Route Group ID', 'route_group_id']),
       customer_update_request: getByAliases(row, ['Customer Update Request', 'customer_update_request']),
     };
 
@@ -478,8 +563,13 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       notes: hasServiceDetailsColumn ? getAt(row, 21) : getAt(row, 20),
       status: (hasServiceDetailsColumn ? getAt(row, 22) : getAt(row, 21)) || 'pending',
       assigned_employee: hasServiceDetailsColumn ? getAt(row, 23) : getAt(row, 22),
-      customer_update_request: hasServiceDetailsColumn ? getAt(row, 24) : getAt(row, 23),
-      scheduled_duration_minutes: hasServiceDetailsColumn ? getAt(row, 25) : getAt(row, 24),
+      route_name: hasServiceDetailsColumn ? getAt(row, 24) : '',
+      route_stop_order: hasServiceDetailsColumn ? getAt(row, 25) : '',
+      route_estimated_travel_minutes: hasServiceDetailsColumn ? getAt(row, 26) : '',
+      route_ai_summary: hasServiceDetailsColumn ? getAt(row, 27) : '',
+      route_group_id: hasServiceDetailsColumn ? getAt(row, 28) : '',
+      customer_update_request: hasServiceDetailsColumn ? getAt(row, 29) : getAt(row, 23),
+      scheduled_duration_minutes: hasServiceDetailsColumn ? getAt(row, 30) : getAt(row, 24),
     };
 
     const usePositional = scoreCandidate(positionalBase) > scoreCandidate(headerBasedBase);
@@ -523,6 +613,11 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       notes: base.notes,
       status: base.status || 'pending',
       assigned_employee: base.assigned_employee,
+      route_name: base.route_name,
+      route_stop_order: base.route_stop_order,
+      route_estimated_travel_minutes: base.route_estimated_travel_minutes,
+      route_ai_summary: base.route_ai_summary,
+      route_group_id: base.route_group_id,
       customer_update_request: base.customer_update_request,
     };
   });
@@ -566,6 +661,10 @@ function parseUserRows(rows: string[][]): UserSheetRow[] {
     clock_in_at: get(row, 'Clock In At').trim(),
     clock_out_at: get(row, 'Clock Out At').trim(),
     tracked_minutes_total: get(row, 'Tracked Minutes Total').trim() || '0',
+    route_role: get(row, 'Route Role').trim(),
+    pay_type: get(row, 'Pay Type').trim(),
+    pay_rate: get(row, 'Pay Rate').trim(),
+    job_description: get(row, 'Job Description').trim(),
   }));
 }
 
@@ -644,6 +743,57 @@ function parseJobApplicationRows(rows: string[][]): JobApplication[] {
   });
 }
 
+function parseTimesheetRows(rows: string[][]): TimesheetSheetRow[] {
+  if (rows.length < 2) return [];
+  const headers = rows[0];
+  const idx = (name: string) => headers.indexOf(name);
+  const get = (row: Array<string | number>, name: string) => {
+    const index = idx(name);
+    if (index < 0) return '';
+    const value = row[index];
+    return value === undefined || value === null ? '' : String(value).trim();
+  };
+
+  return rows.slice(1).map((row, rowOffset) => ({
+    created_at: get(row, 'Created At'),
+    entry_id: get(row, 'Entry ID') || `ENTRY-${rowOffset + 2}`,
+    employee_email: get(row, 'Employee Email').toLowerCase(),
+    clock_in_at: get(row, 'Clock In At'),
+    clock_out_at: get(row, 'Clock Out At'),
+    minutes_worked: get(row, 'Minutes Worked') || '0',
+    source: get(row, 'Source') || 'clock',
+    status: get(row, 'Status') || 'approved',
+    approved_by: get(row, 'Approved By'),
+    approved_at: get(row, 'Approved At'),
+    notes: get(row, 'Notes'),
+  }));
+}
+
+function parseTimesheetAdjustmentRows(rows: string[][]): TimesheetAdjustmentSheetRow[] {
+  if (rows.length < 2) return [];
+  const headers = rows[0];
+  const idx = (name: string) => headers.indexOf(name);
+  const get = (row: Array<string | number>, name: string) => {
+    const index = idx(name);
+    if (index < 0) return '';
+    const value = row[index];
+    return value === undefined || value === null ? '' : String(value).trim();
+  };
+
+  return rows.slice(1).map((row, rowOffset) => ({
+    created_at: get(row, 'Created At'),
+    request_id: get(row, 'Request ID') || `REQ-${rowOffset + 2}`,
+    employee_email: get(row, 'Employee Email').toLowerCase(),
+    target_date: get(row, 'Target Date'),
+    minutes_delta: get(row, 'Minutes Delta') || '0',
+    reason: get(row, 'Reason'),
+    status: get(row, 'Status') || 'pending',
+    reviewed_by: get(row, 'Reviewed By'),
+    reviewed_at: get(row, 'Reviewed At'),
+    review_notes: get(row, 'Review Notes'),
+  }));
+}
+
 export async function listUsersFromSheet() {
   const rows = await getTabRows(usersTabName());
   return parseUserRows(rows);
@@ -652,6 +802,189 @@ export async function listUsersFromSheet() {
 export async function listJobApplicationsFromSheet() {
   const rows = await getTabRows(jobApplicationsTabName());
   return parseJobApplicationRows(rows);
+}
+
+export async function listTimesheetEntriesFromSheet() {
+  const rows = await getTabRows(timesheetTabName());
+  return parseTimesheetRows(rows);
+}
+
+export async function listTimesheetEntriesByEmployee(email: string) {
+  const normalized = String(email || '').trim().toLowerCase();
+  const rows = await listTimesheetEntriesFromSheet();
+  return rows.filter((row) => row.employee_email === normalized);
+}
+
+export async function addTimesheetEntry(entry: {
+  employee_email: string;
+  clock_in_at: string;
+  clock_out_at: string;
+  minutes_worked: number;
+  source?: string;
+  status?: string;
+  approved_by?: string;
+  notes?: string;
+}) {
+  try {
+    const init = await initializeSheet();
+    if (!init.success) return init;
+
+    const client = await getSheetsClient();
+    if (!client) return { success: false as const, error: 'Google Sheets not configured' };
+
+    const { sheets, spreadsheetId } = client;
+    const nowIso = new Date().toISOString();
+    const entryId = `TS-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+    await withRetry(() => sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${timesheetTabName()}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[
+          nowIso,
+          entryId,
+          String(entry.employee_email || '').trim().toLowerCase(),
+          String(entry.clock_in_at || '').trim(),
+          String(entry.clock_out_at || '').trim(),
+          String(Math.max(0, Math.round(Number(entry.minutes_worked || 0)))),
+          String(entry.source || 'clock').trim(),
+          String(entry.status || 'approved').trim(),
+          String(entry.approved_by || '').trim(),
+          entry.approved_by ? nowIso : '',
+          String(entry.notes || '').trim(),
+        ]],
+      },
+    }));
+
+    return { success: true as const, entry_id: entryId };
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message };
+  }
+}
+
+export async function listTimesheetAdjustmentRequestsByEmployee(email: string) {
+  const normalized = String(email || '').trim().toLowerCase();
+  const rows = await getTabRows(timesheetAdjustmentsTabName());
+  const requests = parseTimesheetAdjustmentRows(rows);
+  return requests.filter((request) => request.employee_email === normalized);
+}
+
+export async function listTimesheetAdjustmentRequestsFromSheet() {
+  const rows = await getTabRows(timesheetAdjustmentsTabName());
+  return parseTimesheetAdjustmentRows(rows);
+}
+
+export async function addTimesheetAdjustmentRequest(input: {
+  employee_email: string;
+  target_date: string;
+  minutes_delta: number;
+  reason: string;
+}) {
+  try {
+    const init = await initializeSheet();
+    if (!init.success) return init;
+
+    const client = await getSheetsClient();
+    if (!client) return { success: false as const, error: 'Google Sheets not configured' };
+
+    const { sheets, spreadsheetId } = client;
+    const nowIso = new Date().toISOString();
+    const requestId = `ADJ-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+    await withRetry(() => sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${timesheetAdjustmentsTabName()}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[
+          nowIso,
+          requestId,
+          String(input.employee_email || '').trim().toLowerCase(),
+          String(input.target_date || '').trim(),
+          String(Math.round(Number(input.minutes_delta || 0))),
+          String(input.reason || '').trim(),
+          'pending',
+          '',
+          '',
+          '',
+        ]],
+      },
+    }));
+
+    return { success: true as const, request_id: requestId };
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message };
+  }
+}
+
+function normalizeAdjustmentRequestIdentifier(value: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    return decodeURIComponent(raw).trim();
+  } catch {
+    return raw;
+  }
+}
+
+function adjustmentRequestIdsMatch(left: string, right: string) {
+  return normalizeAdjustmentRequestIdentifier(left).toLowerCase() === normalizeAdjustmentRequestIdentifier(right).toLowerCase();
+}
+
+export async function updateTimesheetAdjustmentRequestInSheet(
+  requestId: string,
+  updates: Partial<Pick<TimesheetAdjustmentSheetRow, 'status' | 'reviewed_by' | 'reviewed_at' | 'review_notes'>>
+) {
+  const client = await getSheetsClient();
+  if (!client) return { success: false as const, error: 'Google Sheets not configured' };
+
+  const { sheets, spreadsheetId } = client;
+  const rows = await getTabRows(timesheetAdjustmentsTabName());
+  if (rows.length < 2) return { success: false as const, error: 'No adjustment requests found' };
+
+  const headers = rows[0];
+  const requestIdIndexCandidates = findHeaderIndexes(headers, ['Request ID', 'request_id', 'RequestId', 'ID']);
+  if (requestIdIndexCandidates.length === 0) {
+    return { success: false as const, error: 'Request ID column not found' };
+  }
+
+  const normalizedRequestId = normalizeAdjustmentRequestIdentifier(requestId);
+  const rowIndex = rows.findIndex((row, index) => {
+    if (index <= 0) return false;
+    return requestIdIndexCandidates.some((candidateIndex) => {
+      const rowValue = String(row[candidateIndex] || '');
+      return adjustmentRequestIdsMatch(rowValue, normalizedRequestId);
+    });
+  });
+
+  if (rowIndex === -1) return { success: false as const, error: 'Adjustment request not found' };
+
+  const row = rows[rowIndex];
+  const setByAliases = (aliases: string[], value?: string) => {
+    if (value === undefined) return;
+    const indexes = findHeaderIndexes(headers, aliases);
+    if (indexes.length === 0) return;
+    row[indexes[0]] = value;
+  };
+
+  setByAliases(['Status', 'status'], updates.status);
+  setByAliases(['Reviewed By', 'reviewed_by'], updates.reviewed_by);
+  setByAliases(['Reviewed At', 'reviewed_at'], updates.reviewed_at);
+  setByAliases(['Review Notes', 'review_notes'], updates.review_notes);
+
+  const endColumn = columnNumberToName(headers.length);
+  const range = `${timesheetAdjustmentsTabName()}!A${rowIndex + 1}:${endColumn}${rowIndex + 1}`;
+
+  await withRetry(() => sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [row] },
+  }));
+
+  return { success: true as const };
 }
 
 function normalizeJobApplicationIdentifier(value: string) {
@@ -725,6 +1058,11 @@ export async function addBookingToSheet(booking: BookingForm & { booking_id: str
       booking.service_details || '',
       booking.notes || '',
       'pending',
+      '',
+      '',
+      '',
+      '',
+      '',
       '',
       '',
       String(booking.scheduled_duration_minutes ?? 60),
@@ -1145,6 +1483,11 @@ export async function updateBookingInSheet(
   updates: Partial<Pick<BookingSheetRow,
     | 'status'
     | 'assigned_employee'
+    | 'route_name'
+    | 'route_stop_order'
+    | 'route_estimated_travel_minutes'
+    | 'route_ai_summary'
+    | 'route_group_id'
     | 'customer_update_request'
     | 'notes'
     | 'scheduled_date'
@@ -1197,6 +1540,11 @@ export async function updateBookingInSheet(
 
   setByAliases(['Status', 'status'], updates.status);
   setByAliases(['Assigned Employee', 'assigned_employee'], updates.assigned_employee);
+  setByAliases(['Route Name', 'route_name'], updates.route_name);
+  setByAliases(['Route Stop Order', 'route_stop_order', 'stop_order'], updates.route_stop_order);
+  setByAliases(['Route Estimated Travel Minutes', 'route_estimated_travel_minutes', 'travel_minutes'], updates.route_estimated_travel_minutes);
+  setByAliases(['Route AI Summary', 'route_ai_summary'], updates.route_ai_summary);
+  setByAliases(['Route Group ID', 'route_group_id'], updates.route_group_id);
   setByAliases(['Scheduled Date', 'scheduled_date'], updates.scheduled_date);
   setByAliases(['Scheduled Time', 'scheduled_time'], updates.scheduled_time);
   setByAliases(['Scheduled Duration Minutes', 'scheduled_duration_minutes', 'Duration Minutes', 'duration_minutes'], updates.scheduled_duration_minutes);
@@ -1292,7 +1640,7 @@ export async function findUserByEmail(email: string) {
 
 export async function updateUserInSheet(
   email: string,
-  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires' | 'password_reset_token' | 'password_reset_expires' | 'available_dates' | 'managed_groups' | 'forms_terms_signed_at' | 'forms_work_contract_signed_at' | 'forms_job_description_signed_at' | 'forms_pay_terms_signed_at' | 'training_completed_at' | 'shadow_required' | 'shadow_completed_at' | 'shadow_mentor_email' | 'clock_in_at' | 'clock_out_at' | 'tracked_minutes_total'>> & { email_verified?: string | boolean }
+  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires' | 'password_reset_token' | 'password_reset_expires' | 'available_dates' | 'managed_groups' | 'forms_terms_signed_at' | 'forms_work_contract_signed_at' | 'forms_job_description_signed_at' | 'forms_pay_terms_signed_at' | 'training_completed_at' | 'shadow_required' | 'shadow_completed_at' | 'shadow_mentor_email' | 'clock_in_at' | 'clock_out_at' | 'tracked_minutes_total' | 'route_role' | 'pay_type' | 'pay_rate' | 'job_description'>> & { email_verified?: string | boolean }
 ) {
   const client = await getSheetsClient();
   if (!client) return { success: false, error: 'Google Sheets not configured' };
@@ -1338,6 +1686,10 @@ export async function updateUserInSheet(
   set('Clock In At', updates.clock_in_at);
   set('Clock Out At', updates.clock_out_at);
   set('Tracked Minutes Total', updates.tracked_minutes_total);
+  set('Route Role', updates.route_role);
+  set('Pay Type', updates.pay_type);
+  set('Pay Rate', updates.pay_rate);
+  set('Job Description', updates.job_description);
 
   const endColumn = columnNumberToName(headers.length);
   const range = `${usersTabName()}!A${rowIndex + 1}:${endColumn}${rowIndex + 1}`;
@@ -1405,6 +1757,10 @@ export async function createUserInSheet(user: {
         '', // Clock In At
         '', // Clock Out At
         '0', // Tracked Minutes Total
+        '', // Route Role
+        '', // Pay Type
+        '', // Pay Rate
+        '', // Job Description
       ]],
     },
   }));

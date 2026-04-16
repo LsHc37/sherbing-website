@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth/session';
-import { findUserByEmail, updateUserInSheet } from '@/lib/services/googleSheetsService';
+import { addTimesheetEntry, findUserByEmail, updateUserInSheet } from '@/lib/services/googleSheetsService';
 
 type EmployeeOnboardingAction =
   | 'sign_form'
@@ -260,6 +260,20 @@ export async function PATCH(request: NextRequest) {
 
       if (!result.success) {
         return NextResponse.json({ error: result.error || 'Unable to clock out' }, { status: 400 });
+      }
+
+      const timesheetResult = await addTimesheetEntry({
+        employee_email: user.email,
+        clock_in_at: String(user.clock_in_at || '').trim(),
+        clock_out_at: nowIso,
+        minutes_worked: minutesWorked,
+        source: 'clock',
+        status: 'approved',
+        approved_by: user.email,
+      });
+
+      if (!timesheetResult.success) {
+        return NextResponse.json({ error: timesheetResult.error || 'Unable to save timesheet entry' }, { status: 400 });
       }
     }
 

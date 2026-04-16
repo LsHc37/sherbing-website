@@ -47,6 +47,10 @@ export async function GET(request: NextRequest) {
       clock_in_at: user.clock_in_at || '',
       clock_out_at: user.clock_out_at || '',
       tracked_minutes_total: user.tracked_minutes_total || '0',
+      route_role: user.route_role || '',
+      pay_type: user.pay_type || '',
+      pay_rate: user.pay_rate || '',
+      job_description: user.job_description || '',
     },
   });
 
