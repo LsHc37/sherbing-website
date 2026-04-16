@@ -73,6 +73,10 @@ export async function GET(request: NextRequest) {
         route_group_id: booking.route_group_id || '',
         customer_update_request: booking.customer_update_request || '',
         notes: booking.notes || '',
+        sales_referral_code: booking.sales_referral_code || '',
+        sales_referral_email: booking.sales_referral_email || '',
+        sales_commission_rate: booking.sales_commission_rate || '',
+        sales_commission_amount: booking.sales_commission_amount || '',
         created_at: booking.timestamp,
       };
     });

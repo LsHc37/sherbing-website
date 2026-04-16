@@ -163,6 +163,11 @@ export default function CareersApplicationForm() {
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-sky-200 bg-sky-50/80 p-4">
+            <p className="text-sm font-semibold text-sky-900">Starting pay</p>
+            <p className="mt-2 text-2xl font-bold text-sky-950">Around $20/hour</p>
+            <p className="mt-2 text-sm text-sky-900/80">Pay can increase based on experience, reliability, and the kind of work you can take on.</p>
+          </div>
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
             <p className="text-sm font-semibold text-emerald-900">What we look for</p>
             <p className="mt-2 text-sm text-emerald-900/80">Professional communication, reliable transportation, and the ability to complete outdoor work safely and consistently.</p>
@@ -185,6 +190,12 @@ export default function CareersApplicationForm() {
             </p>
             <p>
               In short, Sherbing acts as the booking and operations partner so you can stay focused on delivering quality work in the field.
+            </p>
+          </div>
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-900">Job details</p>
+            <p className="mt-2 text-sm text-amber-900/90 leading-7">
+              Day-to-day work includes lawn mowing, trimming, outdoor cleanup, equipment handling, and serving residential customers on scheduled routes. This is a hands-on field role for someone who can work independently and keep a professional standard on every job.
             </p>
           </div>
         </section>

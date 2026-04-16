@@ -47,6 +47,8 @@ type TimesheetPayload = {
     payable_hours: number;
     shift_count: number;
     work_day_count: number;
+    sales_commission_total: number;
+    sales_commission_count: number;
     estimated_gross_pay: number;
     estimate_detail: string;
   };
@@ -199,7 +201,7 @@ export default function EmployeeTimesheetPage() {
         {error && <div className="bg-red-50 border border-red-200 rounded p-3 text-red-700">{error}</div>}
         {message && <div className="bg-green-50 border border-green-200 rounded p-3 text-green-700">{message}</div>}
 
-        <section className="bg-white rounded-lg shadow p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <section className="bg-white rounded-lg shadow p-6 grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <p className="text-sm text-gray-500">Pay Period</p>
             <p className="font-semibold text-gray-900">{data.pay_period.label}</p>
@@ -218,6 +220,11 @@ export default function EmployeeTimesheetPage() {
             <p className="text-sm text-gray-500">Pay Setup</p>
             <p className="font-semibold text-gray-900">{data.employee.pay_type || 'hourly'} @ ${data.employee.pay_rate.toFixed(2)}</p>
             <p className="text-xs text-gray-500">Route role: {data.employee.route_role || 'Not set'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Sales Commission</p>
+            <p className="text-2xl font-bold text-sky-700">${data.summary.sales_commission_total.toFixed(2)}</p>
+            <p className="text-xs text-gray-500">{data.summary.sales_commission_count} referred bookings</p>
           </div>
         </section>
 

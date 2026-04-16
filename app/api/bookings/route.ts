@@ -1,5 +1,6 @@
 import { addBookingToSheet } from '@/lib/services/googleSheetsService';
 import { clearAllBookingsInSheet } from '@/lib/services/googleSheetsService';
+import { findUserByReferralCode } from '@/lib/services/googleSheetsService';
 import { sendBookingConfirmation } from '@/lib/services/bookingService';
 import type { BookingForm } from '@/lib/types';
 import { enforceMinimumCustomerPrice } from '@/lib/services/payoutService';
@@ -41,6 +42,12 @@ function buildServiceDetails(body: Record<string, unknown>) {
   return details.join(' | ');
 }
 
+function parseCommissionRate(rate: unknown) {
+  const numericRate = Number(rate);
+  if (!Number.isFinite(numericRate) || numericRate <= 0) return 0;
+  return numericRate > 1 ? numericRate / 100 : numericRate;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -79,6 +86,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const referralCode = String(body.sales_referral_code || body.referral_code || '').trim();
+    const referredUser = referralCode ? await findUserByReferralCode(referralCode) : undefined;
+    const referralCommissionRate = parseCommissionRate(referredUser?.sales_commission_rate || body.sales_commission_rate || 0);
+    const referralCommissionAmount = referralCommissionRate > 0
+      ? Math.round(enforceMinimumCustomerPrice(Number(body.estimated_price || 0)) * referralCommissionRate * 100) / 100
+      : 0;
+
     const bookingData: BookingForm & { booking_id: string; estimated_price: number } = {
       ...body,
       customer_email: customerEmail,
@@ -86,6 +100,10 @@ export async function POST(request: NextRequest) {
       estimated_price: enforceMinimumCustomerPrice(Number(body.estimated_price || 0)),
       service_details: buildServiceDetails(body as Record<string, unknown>),
       scheduled_duration_minutes: Number.isFinite(scheduledDurationMinutes) ? scheduledDurationMinutes : 60,
+      sales_referral_code: referredUser?.sales_referral_code || referralCode,
+      sales_referral_email: referredUser?.email || String(body.sales_referral_email || ''),
+      sales_commission_rate: referralCommissionRate ? String(referralCommissionRate) : '',
+      sales_commission_amount: referralCommissionAmount ? String(referralCommissionAmount) : '',
     };
 
     // Booking should only succeed if persistence succeeds.

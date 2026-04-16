@@ -25,6 +25,8 @@ type User = {
   pay_type?: string;
   pay_rate?: string;
   job_description?: string;
+  sales_referral_code?: string;
+  sales_commission_rate?: string;
 };
 
 export default function AdminUsersPage() {
@@ -38,6 +40,8 @@ export default function AdminUsersPage() {
   const [payTypeDrafts, setPayTypeDrafts] = useState<Record<string, string>>({});
   const [payRateDrafts, setPayRateDrafts] = useState<Record<string, string>>({});
   const [jobDescriptionDrafts, setJobDescriptionDrafts] = useState<Record<string, string>>({});
+  const [salesReferralCodeDrafts, setSalesReferralCodeDrafts] = useState<Record<string, string>>({});
+  const [salesCommissionRateDrafts, setSalesCommissionRateDrafts] = useState<Record<string, string>>({});
   const [inviteData, setInviteData] = useState({
     full_name: '',
     email: '',
@@ -125,18 +129,24 @@ export default function AdminUsersPage() {
     const nextPayTypeDrafts: Record<string, string> = {};
     const nextPayRateDrafts: Record<string, string> = {};
     const nextJobDescriptionDrafts: Record<string, string> = {};
+    const nextSalesReferralCodeDrafts: Record<string, string> = {};
+    const nextSalesCommissionRateDrafts: Record<string, string> = {};
     for (const user of loadedUsers as User[]) {
       nextManagedGroups[user.email] = String(user.managed_groups || '');
       nextRouteRoleDrafts[user.email] = String(user.route_role || '');
       nextPayTypeDrafts[user.email] = String(user.pay_type || '');
       nextPayRateDrafts[user.email] = String(user.pay_rate || '');
       nextJobDescriptionDrafts[user.email] = String(user.job_description || '');
+      nextSalesReferralCodeDrafts[user.email] = String(user.sales_referral_code || '');
+      nextSalesCommissionRateDrafts[user.email] = String(user.sales_commission_rate || '');
     }
     setManagedGroupDrafts(nextManagedGroups);
     setRouteRoleDrafts(nextRouteRoleDrafts);
     setPayTypeDrafts(nextPayTypeDrafts);
     setPayRateDrafts(nextPayRateDrafts);
     setJobDescriptionDrafts(nextJobDescriptionDrafts);
+    setSalesReferralCodeDrafts(nextSalesReferralCodeDrafts);
+    setSalesCommissionRateDrafts(nextSalesCommissionRateDrafts);
 
     setLoading(false);
   }, []);
@@ -149,7 +159,7 @@ export default function AdminUsersPage() {
     return () => clearTimeout(timer);
   }, [load]);
 
-  const updateUser = async (email: string, payload: { role?: User['role']; active?: string; available_dates?: string; managed_groups?: string; route_role?: string; pay_type?: string; pay_rate?: string; job_description?: string }) => {
+  const updateUser = async (email: string, payload: { role?: User['role']; active?: string; available_dates?: string; managed_groups?: string; route_role?: string; pay_type?: string; pay_rate?: string; job_description?: string; sales_referral_code?: string; sales_commission_rate?: string }) => {
     const response = await fetch(`/api/users/${encodeURIComponent(email)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -184,7 +194,27 @@ export default function AdminUsersPage() {
       pay_type: payTypeDrafts[email] || '',
       pay_rate: payRateDrafts[email] || '',
       job_description: jobDescriptionDrafts[email] || '',
+      sales_referral_code: salesReferralCodeDrafts[email] || '',
+      sales_commission_rate: salesCommissionRateDrafts[email] || '',
     });
+  };
+
+  const getReferralLink = (user: User) => {
+    const referralCode = String(salesReferralCodeDrafts[user.email] || user.sales_referral_code || '').trim();
+    if (!referralCode) return '';
+    if (typeof window === 'undefined') return `/booking?ref=${encodeURIComponent(referralCode)}`;
+    return `${window.location.origin}/booking?ref=${encodeURIComponent(referralCode)}`;
+  };
+
+  const copyReferralLink = async (user: User) => {
+    const link = getReferralLink(user);
+    if (!link) {
+      setMessage(`Set a referral code for ${user.email} first`);
+      return;
+    }
+
+    await navigator.clipboard.writeText(link);
+    setMessage(`Copied referral link for ${user.email}`);
   };
 
   const addAvailabilityDate = (email: string) => {
@@ -469,6 +499,40 @@ export default function AdminUsersPage() {
                           className="px-2 py-1 border rounded"
                           placeholder="Pay rate (e.g. 22.50)"
                         />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={salesReferralCodeDrafts[user.email] || ''}
+                          onChange={(e) => setSalesReferralCodeDrafts((prev) => ({
+                            ...prev,
+                            [user.email]: e.target.value,
+                          }))}
+                          className="px-2 py-1 border rounded"
+                          placeholder="Referral code"
+                        />
+                        <input
+                          type="text"
+                          value={salesCommissionRateDrafts[user.email] || ''}
+                          onChange={(e) => setSalesCommissionRateDrafts((prev) => ({
+                            ...prev,
+                            [user.email]: e.target.value,
+                          }))}
+                          className="px-2 py-1 border rounded"
+                          placeholder="Commission rate %"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void copyReferralLink(user)}
+                          className="px-2 py-1 bg-sky-100 text-sky-800 rounded"
+                        >
+                          Copy Referral Link
+                        </button>
+                        <span className="text-xs text-gray-500 break-all">
+                          {getReferralLink(user) || 'Set a referral code to generate a link'}
+                        </span>
                       </div>
                       <textarea
                         value={jobDescriptionDrafts[user.email] || ''}

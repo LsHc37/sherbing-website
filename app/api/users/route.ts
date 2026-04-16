@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
       pay_type: user.pay_type || '',
       pay_rate: user.pay_rate || '',
       job_description: user.job_description || '',
+      sales_referral_code: user.sales_referral_code || '',
+      sales_commission_rate: user.sales_commission_rate || '',
     }));
 
     return NextResponse.json(safeUsers);

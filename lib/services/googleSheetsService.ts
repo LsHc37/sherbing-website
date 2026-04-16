@@ -36,6 +36,10 @@ type BookingSheetRow = {
   route_estimated_travel_minutes?: string;
   route_ai_summary?: string;
   route_group_id?: string;
+  sales_referral_code?: string;
+  sales_referral_email?: string;
+  sales_commission_rate?: string;
+  sales_commission_amount?: string;
   customer_update_request: string;
   timestamp: string;
 };
@@ -70,6 +74,8 @@ type UserSheetRow = {
   pay_type?: string;
   pay_rate?: string;
   job_description?: string;
+  sales_referral_code?: string;
+  sales_commission_rate?: string;
 };
 
 type JobApplicationSheetRow = {
@@ -353,6 +359,10 @@ export async function initializeSheet() {
     'Route Estimated Travel Minutes',
     'Route AI Summary',
     'Route Group ID',
+    'Sales Referral Code',
+    'Sales Referral Email',
+    'Sales Commission Rate',
+    'Sales Commission Amount',
     'Customer Update Request',
     'Scheduled Duration Minutes',
   ];
@@ -387,6 +397,8 @@ export async function initializeSheet() {
     'Pay Type',
     'Pay Rate',
     'Job Description',
+    'Sales Referral Code',
+    'Sales Commission Rate',
   ];
 
   const jobApplicationHeaders = [
@@ -535,6 +547,10 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       route_estimated_travel_minutes: getByAliases(row, ['Route Estimated Travel Minutes', 'route_estimated_travel_minutes', 'travel_minutes']),
       route_ai_summary: getByAliases(row, ['Route AI Summary', 'route_ai_summary']),
       route_group_id: getByAliases(row, ['Route Group ID', 'route_group_id']),
+      sales_referral_code: getByAliases(row, ['Sales Referral Code', 'sales_referral_code']),
+      sales_referral_email: getByAliases(row, ['Sales Referral Email', 'sales_referral_email']),
+      sales_commission_rate: getByAliases(row, ['Sales Commission Rate', 'sales_commission_rate']),
+      sales_commission_amount: getByAliases(row, ['Sales Commission Amount', 'sales_commission_amount']),
       customer_update_request: getByAliases(row, ['Customer Update Request', 'customer_update_request']),
     };
 
@@ -568,8 +584,12 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       route_estimated_travel_minutes: hasServiceDetailsColumn ? getAt(row, 26) : '',
       route_ai_summary: hasServiceDetailsColumn ? getAt(row, 27) : '',
       route_group_id: hasServiceDetailsColumn ? getAt(row, 28) : '',
-      customer_update_request: hasServiceDetailsColumn ? getAt(row, 29) : getAt(row, 23),
-      scheduled_duration_minutes: hasServiceDetailsColumn ? getAt(row, 30) : getAt(row, 24),
+      sales_referral_code: hasServiceDetailsColumn ? getAt(row, 29) : '',
+      sales_referral_email: hasServiceDetailsColumn ? getAt(row, 30) : '',
+      sales_commission_rate: hasServiceDetailsColumn ? getAt(row, 31) : '',
+      sales_commission_amount: hasServiceDetailsColumn ? getAt(row, 32) : '',
+      customer_update_request: hasServiceDetailsColumn ? getAt(row, 33) : getAt(row, 23),
+      scheduled_duration_minutes: hasServiceDetailsColumn ? getAt(row, 34) : getAt(row, 24),
     };
 
     const usePositional = scoreCandidate(positionalBase) > scoreCandidate(headerBasedBase);
@@ -618,6 +638,10 @@ function parseBookingRows(rows: string[][]): BookingSheetRow[] {
       route_estimated_travel_minutes: base.route_estimated_travel_minutes,
       route_ai_summary: base.route_ai_summary,
       route_group_id: base.route_group_id,
+      sales_referral_code: base.sales_referral_code,
+      sales_referral_email: base.sales_referral_email,
+      sales_commission_rate: base.sales_commission_rate,
+      sales_commission_amount: base.sales_commission_amount,
       customer_update_request: base.customer_update_request,
     };
   });
@@ -665,6 +689,8 @@ function parseUserRows(rows: string[][]): UserSheetRow[] {
     pay_type: get(row, 'Pay Type').trim(),
     pay_rate: get(row, 'Pay Rate').trim(),
     job_description: get(row, 'Job Description').trim(),
+    sales_referral_code: get(row, 'Sales Referral Code').trim(),
+    sales_commission_rate: get(row, 'Sales Commission Rate').trim(),
   }));
 }
 
@@ -1033,6 +1059,10 @@ export async function addBookingToSheet(booking: BookingForm & { booking_id: str
     const city = String(booking.city || '').trim();
     const state = String(booking.state || '').trim();
     const zipCode = String(booking.zip_code || '').trim();
+    const salesReferralCode = String(booking.sales_referral_code || '').trim();
+    const salesReferralEmail = String(booking.sales_referral_email || '').trim();
+    const salesCommissionRate = String(booking.sales_commission_rate || '').trim();
+    const salesCommissionAmount = String(booking.sales_commission_amount || '').trim();
 
     const values = [[
       new Date().toISOString(),
@@ -1057,6 +1087,10 @@ export async function addBookingToSheet(booking: BookingForm & { booking_id: str
       booking.package_id || '',
       booking.service_details || '',
       booking.notes || '',
+      salesReferralCode,
+      salesReferralEmail,
+      salesCommissionRate,
+      salesCommissionAmount,
       'pending',
       '',
       '',
@@ -1638,9 +1672,17 @@ export async function findUserByEmail(email: string) {
   return users.find((u) => u.email === email.toLowerCase());
 }
 
+export async function findUserByReferralCode(referralCode: string) {
+  const normalized = referralCode.trim().toLowerCase();
+  if (!normalized) return undefined;
+
+  const users = await listUsersFromSheet();
+  return users.find((u) => String(u.sales_referral_code || '').trim().toLowerCase() === normalized);
+}
+
 export async function updateUserInSheet(
   email: string,
-  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires' | 'password_reset_token' | 'password_reset_expires' | 'available_dates' | 'managed_groups' | 'forms_terms_signed_at' | 'forms_work_contract_signed_at' | 'forms_job_description_signed_at' | 'forms_pay_terms_signed_at' | 'training_completed_at' | 'shadow_required' | 'shadow_completed_at' | 'shadow_mentor_email' | 'clock_in_at' | 'clock_out_at' | 'tracked_minutes_total' | 'route_role' | 'pay_type' | 'pay_rate' | 'job_description'>> & { email_verified?: string | boolean }
+  updates: Partial<Pick<UserSheetRow, 'role' | 'active' | 'full_name' | 'phone' | 'password_hash' | 'email_verification_code' | 'email_verification_expires' | 'password_reset_token' | 'password_reset_expires' | 'available_dates' | 'managed_groups' | 'forms_terms_signed_at' | 'forms_work_contract_signed_at' | 'forms_job_description_signed_at' | 'forms_pay_terms_signed_at' | 'training_completed_at' | 'shadow_required' | 'shadow_completed_at' | 'shadow_mentor_email' | 'clock_in_at' | 'clock_out_at' | 'tracked_minutes_total' | 'route_role' | 'pay_type' | 'pay_rate' | 'job_description' | 'sales_referral_code' | 'sales_commission_rate'>> & { email_verified?: string | boolean }
 ) {
   const client = await getSheetsClient();
   if (!client) return { success: false, error: 'Google Sheets not configured' };
@@ -1690,6 +1732,8 @@ export async function updateUserInSheet(
   set('Pay Type', updates.pay_type);
   set('Pay Rate', updates.pay_rate);
   set('Job Description', updates.job_description);
+  set('Sales Referral Code', updates.sales_referral_code);
+  set('Sales Commission Rate', updates.sales_commission_rate);
 
   const endColumn = columnNumberToName(headers.length);
   const range = `${usersTabName()}!A${rowIndex + 1}:${endColumn}${rowIndex + 1}`;
@@ -1713,6 +1757,8 @@ export async function createUserInSheet(user: {
   email_verified?: boolean;
   email_verification_code?: string;
   email_verification_expires?: string;
+  sales_referral_code?: string;
+  sales_commission_rate?: string;
 }) {
   const init = await initializeSheet();
   if (!init.success) return init;
@@ -1761,6 +1807,8 @@ export async function createUserInSheet(user: {
         '', // Pay Type
         '', // Pay Rate
         '', // Job Description
+        user.sales_referral_code || '', // Sales Referral Code
+        user.sales_commission_rate || '', // Sales Commission Rate
       ]],
     },
   }));

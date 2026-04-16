@@ -59,6 +59,7 @@ export default function BookingContent() {
     scheduled_time: '',
     scheduled_duration_minutes: 60,
     notes: '',
+    sales_referral_code: '',
   });
 
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null);
@@ -84,27 +85,32 @@ export default function BookingContent() {
 
   useEffect(() => {
     const queryServiceId = searchParams.get('service');
+    const referralCode = searchParams.get('ref') || searchParams.get('referral') || searchParams.get('sales_referral_code');
 
-    if (!queryServiceId) {
-      return;
-    }
+    if (queryServiceId) {
+      if (!services.some((service) => service.id === queryServiceId)) {
+        console.warn(`Service ${queryServiceId} not found`);
+      } else {
+        setFormData((prev) => {
+          // Only update if the service isn't already selected
+          if (prev.service_ids.includes(queryServiceId)) {
+            return prev;
+          }
 
-    if (!services.some((service) => service.id === queryServiceId)) {
-      console.warn(`Service ${queryServiceId} not found`);
-      return;
-    }
-
-    setFormData((prev) => {
-      // Only update if the service isn't already selected
-      if (prev.service_ids.includes(queryServiceId)) {
-        return prev;
+          return {
+            ...prev,
+            service_ids: [queryServiceId],
+          };
+        });
       }
+    }
 
-      return {
+    if (referralCode) {
+      setFormData((prev) => ({
         ...prev,
-        service_ids: [queryServiceId],
-      };
-    });
+        sales_referral_code: referralCode.trim(),
+      }));
+    }
   }, [searchParams, services]);
 
   const canEstimate = useMemo(() => {
@@ -354,6 +360,7 @@ export default function BookingContent() {
         body: JSON.stringify({
           ...formData,
           estimated_price: estimatedPrice || 0,
+          referral_code: formData.sales_referral_code,
         }),
       });
 

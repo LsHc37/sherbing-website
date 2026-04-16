@@ -67,6 +67,12 @@ function parseRate(value: unknown): number {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
+function normalizeReferralRate(value: unknown): number {
+  const parsed = Number(String(value ?? '').trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  return parsed > 1 ? parsed / 100 : parsed;
+}
+
 function formatDisplayDate(dateIso: string) {
   const parsed = new Date(dateIso);
   return Number.isNaN(parsed.getTime()) ? dateIso : parsed.toLocaleDateString();
@@ -106,6 +112,35 @@ async function buildTimesheetPayload(email: string) {
 
   const payType = String(user.pay_type || 'hourly').trim().toLowerCase() || 'hourly';
   const payRate = parseRate(user.pay_rate);
+  const userReferralCode = String(user.sales_referral_code || '').trim().toLowerCase();
+  const userReferralRate = normalizeReferralRate(user.sales_commission_rate);
+
+  const bookings = await listBookingsFromSheet();
+  const referralBookings = bookings
+    .filter((booking) => {
+      const bookingReferralEmail = String(booking.sales_referral_email || '').trim().toLowerCase();
+      const bookingReferralCode = String(booking.sales_referral_code || '').trim().toLowerCase();
+      return (
+        bookingReferralEmail === email.toLowerCase() ||
+        (userReferralCode && bookingReferralCode === userReferralCode)
+      );
+    })
+    .filter((booking) => {
+      const status = String(booking.status || '').toLowerCase();
+      return status === 'completed' || status === 'confirmed';
+    })
+    .filter((booking) => inPeriod(String(booking.scheduled_date || ''), period.start, period.end));
+
+  const salesCommissionTotal = referralBookings.reduce((sum, booking) => {
+    const storedCommission = parseMoney(booking.sales_commission_amount);
+    if (storedCommission > 0) {
+      return sum + storedCommission;
+    }
+
+    const baseAmount = parseMoney(booking.employee_payout || booking.customer_price || booking.estimated_price);
+    const fallbackRate = normalizeReferralRate(booking.sales_commission_rate) || userReferralRate;
+    return sum + baseAmount * fallbackRate;
+  }, 0);
 
   let estimatedGrossPay = 0;
   let estimateDetail = '';
@@ -133,6 +168,11 @@ async function buildTimesheetPayload(email: string) {
   } else {
     estimatedGrossPay = hoursWorked * payRate;
     estimateDetail = `${hoursWorked.toFixed(2)} hours x $${payRate.toFixed(2)} per hour`;
+  }
+
+  estimatedGrossPay += salesCommissionTotal;
+  if (salesCommissionTotal > 0) {
+    estimateDetail = estimateDetail ? `${estimateDetail} + $${salesCommissionTotal.toFixed(2)} sales commission` : `$${salesCommissionTotal.toFixed(2)} sales commission`;
   }
 
   const entriesView = periodEntries.map((entry) => ({
@@ -179,6 +219,8 @@ async function buildTimesheetPayload(email: string) {
       payable_hours: Number(hoursWorked.toFixed(2)),
       shift_count: shiftCount,
       work_day_count: uniqueWorkDays,
+      sales_commission_total: Number(salesCommissionTotal.toFixed(2)),
+      sales_commission_count: referralBookings.length,
       estimated_gross_pay: Number(estimatedGrossPay.toFixed(2)),
       estimate_detail: estimateDetail,
     },

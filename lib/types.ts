@@ -44,6 +44,8 @@ export interface User {
   clock_out_at?: string;
   tracked_minutes_total?: string;
   email_verified: boolean;
+  sales_referral_code?: string;
+  sales_commission_rate?: string;
   email_verification_code?: string; // Temp code sent via email
   email_verification_expires?: string; // ISO timestamp, usually +10 min from now
   created_at: string;
@@ -76,6 +78,10 @@ export interface Booking {
   scheduled_time?: string; // HH:MM format like "09:00" or "14:30"
   scheduled_duration_minutes?: number;
   notes?: string;
+  sales_referral_code?: string;
+  sales_referral_email?: string;
+  sales_commission_rate?: string;
+  sales_commission_amount?: string;
   created_at: string;
   updated_at: string;
   cancellation_reason?: string;
@@ -109,6 +115,10 @@ export interface BookingForm {
   scheduled_time?: string;
   scheduled_duration_minutes?: number;
   notes?: string;
+  sales_referral_code?: string;
+  sales_referral_email?: string;
+  sales_commission_rate?: string;
+  sales_commission_amount?: string;
 }
 
 export interface Review {

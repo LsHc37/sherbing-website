@@ -35,6 +35,8 @@ export async function PATCH(
     const payType = body.pay_type === undefined ? undefined : String(body.pay_type).trim();
     const payRate = body.pay_rate === undefined ? undefined : String(body.pay_rate).trim();
     const jobDescription = body.job_description === undefined ? undefined : String(body.job_description).trim();
+    const salesReferralCode = body.sales_referral_code === undefined ? undefined : String(body.sales_referral_code).trim().toUpperCase();
+    const salesCommissionRate = body.sales_commission_rate === undefined ? undefined : String(body.sales_commission_rate).trim();
 
     if (role && !['customer', 'employee', 'admin'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
@@ -52,6 +54,8 @@ export async function PATCH(
       pay_type: payType,
       pay_rate: payRate,
       job_description: jobDescription,
+      sales_referral_code: salesReferralCode,
+      sales_commission_rate: salesCommissionRate,
     });
 
     if (!result.success) {
