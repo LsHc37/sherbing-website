@@ -19,6 +19,16 @@ type DayOpenSlots = {
   openTimes: string[];
 };
 
+type EligibilityState = {
+  status: 'idle' | 'checking' | 'eligible' | 'custom_quote' | 'error';
+  message: string;
+  lotSqft?: number;
+  propertySqft?: number;
+  yardSqft?: number;
+};
+
+const QUARTER_ACRE_SQFT = 10890;
+
 function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -75,6 +85,10 @@ export default function BookingContent() {
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityError, setAvailabilityError] = useState('');
   const [quickSelectDates, setQuickSelectDates] = useState<string[]>([]);
+  const [eligibility, setEligibility] = useState<EligibilityState>({
+    status: 'idle',
+    message: '',
+  });
 
   const services = useMemo(() => getServices(), []);
   const minimumScheduleDate = useMemo(() => {
@@ -341,6 +355,65 @@ export default function BookingContent() {
     }
   };
 
+  const checkSpecialEligibility = async () => {
+    if (!formData.address.trim() || !formData.city.trim() || !formData.state.trim() || !formData.zip_code.trim()) {
+      setEligibility({
+        status: 'error',
+        message: 'Enter the full address first so we can check the property size.',
+      });
+      return;
+    }
+
+    setEligibility({
+      status: 'checking',
+      message: 'Checking the address for the summer special...',
+    });
+
+    try {
+      const response = await fetch('/api/estimate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zip_code,
+          service_ids: ['lawn_mowing'],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        setEligibility({
+          status: 'error',
+          message: errorData.error || 'Unable to check eligibility right now.',
+        });
+        return;
+      }
+
+      const data = await response.json();
+      const inferredPropertySqft = Number(data.inferred_property_sqft || 0);
+      const inferredYardSqft = Number(data.inferred_yard_sqft || 0);
+      const lotSqft = Math.max(0, inferredPropertySqft) + Math.max(0, inferredYardSqft);
+      const eligible = lotSqft > 0 && lotSqft <= QUARTER_ACRE_SQFT;
+
+      setEligibility({
+        status: eligible ? 'eligible' : 'custom_quote',
+        message: eligible
+          ? `Eligible for the $200 summer special. Estimated lot size is about ${Math.round(lotSqft).toLocaleString()} sqft, which is at or under 1/4 acre.`
+          : `This property is estimated at about ${Math.round(lotSqft).toLocaleString()} sqft, so a custom quote will be needed instead of the flat $200 special.`,
+        lotSqft,
+        propertySqft: inferredPropertySqft || undefined,
+        yardSqft: inferredYardSqft || undefined,
+      });
+    } catch {
+      setEligibility({
+        status: 'error',
+        message: 'Could not check eligibility right now. Please try again in a moment.',
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors([]);
@@ -599,6 +672,44 @@ export default function BookingContent() {
                   className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                   required
                 />
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900">See if you&apos;re eligible</p>
+                      <p className="text-sm text-amber-900/85">
+                        We&apos;ll check the address and estimate whether the lot is 1/4 acre or smaller.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void checkSpecialEligibility()}
+                      className="btn-secondary whitespace-nowrap px-4 py-2 self-start lg:self-auto"
+                      disabled={eligibility.status === 'checking'}
+                    >
+                      {eligibility.status === 'checking' ? 'Checking...' : 'Check Eligibility'}
+                    </button>
+                  </div>
+                  {eligibility.message && (
+                    <p
+                      className={`mt-3 text-sm leading-6 ${
+                        eligibility.status === 'eligible'
+                          ? 'text-emerald-800'
+                          : eligibility.status === 'custom_quote'
+                            ? 'text-amber-800'
+                            : eligibility.status === 'error'
+                              ? 'text-red-700'
+                              : 'text-slate-700'
+                      }`}
+                    >
+                      {eligibility.message}
+                    </p>
+                  )}
+                  {eligibility.lotSqft ? (
+                    <p className="mt-2 text-xs text-slate-600">
+                      Estimated lot size: {Math.round(eligibility.lotSqft).toLocaleString()} sqft{eligibility.propertySqft ? ` home ${Math.round(eligibility.propertySqft).toLocaleString()} sqft` : ''}{eligibility.yardSqft ? `, yard ${Math.round(eligibility.yardSqft).toLocaleString()} sqft` : ''}.
+                    </p>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
@@ -781,6 +892,9 @@ export default function BookingContent() {
 
           {/* Submit */}
           <div className="surface-card p-8 appear-up stagger-5">
+            <p className="mb-4 text-sm text-slate-700 leading-6">
+              Severely overgrown hedges or larger properties may require a custom quote upon arrival.
+            </p>
             <button
               type="submit"
               disabled={loading}

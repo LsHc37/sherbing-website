@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Sora } from "next/font/google";
 import "./globals.css";
+import SitePromotionBanner from "@/app/components/SitePromotionBanner";
 
 const jakartaSans = Plus_Jakarta_Sans({
   variable: "--font-primary",
@@ -27,7 +28,10 @@ export default function RootLayout({
       lang="en"
       className={`${jakartaSans.variable} ${sora.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SitePromotionBanner />
+        {children}
+      </body>
     </html>
   );
 }
