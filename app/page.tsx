@@ -32,6 +32,9 @@ export default function Home() {
               <Link href="/booking" className="btn-primary px-6 py-3">
                 Book a Service
               </Link>
+              <Link href="/specials" className="btn-secondary px-6 py-3">
+                View Specials
+              </Link>
               <Link href="/careers" className="btn-secondary px-6 py-3">
                 Careers
               </Link>
@@ -73,6 +76,30 @@ export default function Home() {
               <p className="mt-2 text-sm uppercase tracking-wider text-slate-600">{item.label}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="section-container pb-14">
+        <div className="rounded-3xl border border-amber-300 bg-gradient-to-r from-amber-100 via-lime-50 to-emerald-100 px-6 py-8 sm:px-10 sm:py-10 appear-up stagger-2">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="inline-flex rounded-full bg-amber-200 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-amber-900">
+                Special Offers
+              </p>
+              <h2 className="mt-4 text-3xl font-bold text-slate-950">See current specials and seasonal deals.</h2>
+              <p className="mt-3 max-w-2xl text-slate-700 leading-7">
+                Compare our current offers, including the Premium Summer Cleanup special, and jump straight to the booking flow that fits your property.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/specials" className="btn-primary px-6 py-3">
+                View All Specials
+              </Link>
+              <Link href="/special-booking" className="btn-secondary px-6 py-3">
+                Book Summer Special
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 

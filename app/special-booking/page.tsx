@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
-import BookingContent from './booking-content';
+import SpecialBookingContent from './special-booking-content';
 
-function BookingLoading() {
+function SpecialBookingLoading() {
   return (
     <main className="page-shell min-h-screen py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto surface-card p-6 sm:p-8">
@@ -12,10 +12,10 @@ function BookingLoading() {
   );
 }
 
-export default function BookingPage() {
+export default function SpecialBookingPage() {
   return (
-    <Suspense fallback={<BookingLoading />}>
-      <BookingContent />
+    <Suspense fallback={<SpecialBookingLoading />}>
+      <SpecialBookingContent />
     </Suspense>
   );
 }

@@ -4,38 +4,23 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 const BANNER_STORAGE_KEY = 'sherbing-summer-special-banner-dismissed';
-const POPUP_STORAGE_KEY = 'sherbing-summer-special-popup-dismissed';
 
 export default function SitePromotionBanner() {
   const [showBanner, setShowBanner] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
 
   useEffect(() => {
-    let popupTimer: number | undefined;
-
     const initTimer = window.setTimeout(() => {
       try {
         const bannerDismissed = window.localStorage.getItem(BANNER_STORAGE_KEY) === 'true';
-        const popupDismissed = window.localStorage.getItem(POPUP_STORAGE_KEY) === 'true';
-
         setShowBanner(!bannerDismissed);
-
-        if (!popupDismissed) {
-          popupTimer = window.setTimeout(() => {
-            setShowPopup(true);
-          }, 1800);
-        }
       } catch {
         setShowBanner(true);
-        setShowPopup(true);
       }
     }, 0);
 
     return () => {
       window.clearTimeout(initTimer);
-      if (popupTimer) {
-        window.clearTimeout(popupTimer);
-      }
     };
   }, []);
 
@@ -50,18 +35,13 @@ export default function SitePromotionBanner() {
 
   const dismissPopup = () => {
     setShowPopup(false);
-    try {
-      window.localStorage.setItem(POPUP_STORAGE_KEY, 'true');
-    } catch {
-      // Ignore storage failures.
-    }
   };
 
   return (
     <>
       {showBanner && (
         <div className="sticky top-0 z-[60] border-b border-amber-200 bg-gradient-to-r from-amber-100 via-lime-100 to-emerald-100 text-slate-900 shadow-sm">
-          <div className="section-container flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-0">
+          <div className="section-container flex flex-col gap-4 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-0">
             <div className="flex items-start gap-3">
               <span className="mt-0.5 inline-flex rounded-full bg-emerald-700 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-white">
                 Summer Special
@@ -69,13 +49,20 @@ export default function SitePromotionBanner() {
               <div>
                 <p className="font-semibold leading-6">Premium Summer Cleanup: $200 (For standard residential lots up to 1/4 acre).</p>
                 <p className="text-sm text-slate-700">
-                  Dog poop pickup, lawn mowing, weed whacking, hedge trimming, and gutter cleaning. One price for the whole package.
+                  Normal full-price cleanup jobs are usually around $350. This special includes dog poop pickup, lawn mowing, weed whacking, hedge trimming, and gutter cleaning for one flat price.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 self-start sm:self-auto">
-              <Link href="/booking" className="btn-primary whitespace-nowrap px-4 py-2 text-sm">
+            <div className="flex flex-col gap-2 self-stretch sm:self-auto sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={() => setShowPopup(true)}
+                className="btn-secondary justify-center whitespace-nowrap px-4 py-2 text-sm"
+              >
+                View Details
+              </button>
+              <Link href="/booking" className="btn-primary justify-center whitespace-nowrap px-4 py-2 text-sm">
                 Book the Special
               </Link>
               <button
@@ -92,8 +79,8 @@ export default function SitePromotionBanner() {
       )}
 
       {showPopup && (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
-          <div className="surface-card relative w-full max-w-xl overflow-hidden border-amber-200 bg-white">
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/40 p-3 sm:items-center sm:p-4">
+          <div className="surface-card relative w-full max-w-2xl overflow-hidden border-amber-200 bg-white max-h-[90vh] overflow-y-auto">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 via-lime-400 to-emerald-500" />
             <div className="p-6 sm:p-8">
               <div className="flex items-start justify-between gap-4">
@@ -114,8 +101,7 @@ export default function SitePromotionBanner() {
               </div>
 
               <p className="mt-4 text-base leading-7 text-slate-700">
-                One flat price covers the package for standard residential lots up to 1/4 acre: dog poop pickup, lawn mowing, weed whacking,
-                hedge trimming, and gutter cleaning.
+                One flat price covers the package for standard residential lots up to 1/4 acre. Normal cleanup jobs are usually around $350, so this is a strong seasonal discount: dog poop pickup, lawn mowing, weed whacking, hedge trimming, and gutter cleaning.
               </p>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -139,7 +125,7 @@ export default function SitePromotionBanner() {
               </p>
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Link href="/booking" className="btn-primary justify-center px-5 py-3">
+                <Link href="/special-booking" className="btn-primary justify-center px-5 py-3">
                   Claim This Deal
                 </Link>
                 <button
