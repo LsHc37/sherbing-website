@@ -62,8 +62,8 @@ export default function SitePromotionBanner() {
               >
                 View Details
               </button>
-              <Link href="/booking" className="btn-primary justify-center whitespace-nowrap px-4 py-2 text-sm">
-                Book the Special
+              <Link href="/special-booking" className="btn-primary justify-center whitespace-nowrap px-4 py-2 text-sm">
+                Claim Special Now
               </Link>
               <button
                 type="button"
