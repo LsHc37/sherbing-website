@@ -32,6 +32,9 @@ export default function Home() {
               <Link href="/booking" className="btn-primary px-6 py-3">
                 Book a Service
               </Link>
+              <Link href="/how-it-works" className="btn-secondary px-6 py-3">
+                How It Works
+              </Link>
               <Link href="/specials" className="btn-secondary px-6 py-3">
                 View Specials
               </Link>
@@ -144,6 +147,7 @@ export default function Home() {
           <p>Sherbing | Serve Boise with reliable outdoor service teams.</p>
           <div className="flex gap-4">
             <Link href="/about" className="hover:text-slate-900">About Us</Link>
+            <Link href="/how-it-works" className="hover:text-slate-900">How It Works</Link>
             <Link href="/careers" className="hover:text-slate-900">Careers</Link>
             <Link href="/login" className="hover:text-slate-900">Sign In</Link>
             <Link href="/employee/login" className="hover:text-slate-900">Employee Login</Link>
