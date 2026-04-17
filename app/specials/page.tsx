@@ -51,7 +51,7 @@ const specials = [
     subtitle: 'For properties up to 1/4 acre',
     details: [
       'Driveway pressure washing included',
-      'Sidewalk pressure washing included',
+      'Walkway pressure washing included',
       'Same 1/4-acre eligibility check rules',
     ],
     note: 'Flat $150 when the property qualifies at 1/4 acre or less. Larger properties will receive a custom quote.',

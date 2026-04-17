@@ -28,6 +28,7 @@ type EstimatePayload = {
   notes?: string;
   property_sqft?: number;
   yard_sqft?: number;
+  pressure_washing_scope?: 'driveway' | 'walkway' | 'both';
 };
 
 function truncateText(value: string, maxLength: number): string {
@@ -80,6 +81,17 @@ function buildEstimateSummary(
     const addOnsText = addOnsList.length > 0 ? ` with ${addOnsList.join(', ')}` : '';
     summaryParts.push(
       `Lawn service (${frequencyLabel}) includes equipment, fuel, and professional expertise${addOnsText}.`
+    );
+  }
+
+  if (payload.service_ids.includes('pressure_washing')) {
+    const scopeLabel = payload.pressure_washing_scope === 'driveway'
+      ? 'driveway only'
+      : payload.pressure_washing_scope === 'walkway'
+        ? 'walkway only'
+        : 'driveway and walkway';
+    summaryParts.push(
+      `Pressure washing scope: ${scopeLabel}. Typical quotes stay within the $175-$350 range depending on the selected scope and surface size.`
     );
   }
 
@@ -189,6 +201,9 @@ function fallbackEstimate(payload: EstimatePayload): number {
     gutterCleaning: {
       storyCount: payload.gutter_story_count,
     },
+    pressureWashing: {
+      scope: payload.pressure_washing_scope,
+    },
   });
 }
 
@@ -238,6 +253,7 @@ export async function POST(request: NextRequest) {
       property_sqft: property_sqft || undefined,
       yard_sqft: yard_sqft || undefined,
     };
+      const pressure_washing_scope = body.pressure_washing_scope || undefined;
 
     const propertyInsights = await getPropertyPricingInsights({
       address,
@@ -324,6 +340,7 @@ export async function POST(request: NextRequest) {
       `Selected package: ${JSON.stringify(selectedPackage)}`,
       'Lawn mowing pricing uses the following tiers: Small/Patio under 4000 sqft = $35 weekly or $45 bi-weekly; Standard Subdivision 4000-7000 sqft = $45 weekly or $55 bi-weekly; Large/Corner Lot 7000-10000 sqft = $55 weekly or $70 bi-weekly; Estate/Oversized 10000-13000 sqft = $65 weekly or $85 bi-weekly; Acreage/Custom 13000+ sqft = $65 weekly plus $10 per extra 3000 sqft, and bi-weekly should be custom-priced higher because of overgrowth risk. Add 1.5x for initial overgrowth cuts, +$10 for bagging clippings, +$15 for heavy pet waste, and treat blocked access or locked gates as full-charge jobs.',
       'Window cleaning pricing uses a $30 trip charge, $5 per exterior window, $8 per interior-and-exterior window, and $2 per screen/track add-on.',
+      'Pressure washing pricing uses driveway and walkway scope only. Driveway only quotes are usually $175-$250, walkway only quotes are usually $25-$50, both together are normally kept near or under $350, and the customer supplies the water.',
       'Gutter cleaning pricing uses home size and story count only: small under 1500 sqft = $90 single-story or $130 two-story, medium 1500-2500 sqft = $120 single-story or $180 two-story, large 2500+ sqft = $155 single-story or $235 two-story.',
       `Customer notes: ${notes || 'none'}`,
       `Known property sqft from user (if any): ${property_sqft || 'unknown'}`,
@@ -430,9 +447,16 @@ export async function POST(request: NextRequest) {
       gutterCleaning: {
         storyCount: gutter_story_count,
       },
+      pressureWashing: {
+        scope: pressure_washing_scope,
+      },
     });
 
     let safeEstimated = Math.max(estimated_price, deterministicFloorEstimate);
+
+    if (service_ids.includes('pressure_washing')) {
+      safeEstimated = Math.min(safeEstimated, 350);
+    }
 
     safeEstimated = adjustLawnQuoteLikeWalkthrough(
       enrichedPayload,
@@ -461,7 +485,6 @@ export async function POST(request: NextRequest) {
       inferredLawnDurationMinutes,
       aiReasoning
     );
-
     return NextResponse.json(
       {
         estimated_price: safeEstimated,

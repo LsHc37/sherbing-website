@@ -31,6 +31,10 @@ function buildServiceDetails(body: Record<string, unknown>) {
     details.push(`Screen/Track Count: ${String(body.window_screen_track_count || '0')}`);
   }
 
+  if (serviceIds.includes('pressure_washing')) {
+    details.push(`Pressure Washing Scope: ${String(body.pressure_washing_scope || 'both')}`);
+  }
+
   if (serviceIds.includes('gutter_cleaning')) {
     details.push(`Gutter Story Count: ${String(body.gutter_story_count || '1')}`);
   }

@@ -7,9 +7,12 @@ export type ServiceType =
   | 'gutter_cleaning'
   | 'hedge_trimming'
   | 'window_cleaning'
-  | 'dog_waste_removal';
+  | 'dog_waste_removal'
+  | 'pressure_washing';
 
 export type WindowCleaningScope = 'exterior' | 'interior_exterior';
+
+export type PressureWashingScope = 'driveway' | 'walkway' | 'both';
 
 export type LawnMowingFrequency = 'weekly' | 'bi_weekly';
 
@@ -60,6 +63,7 @@ export interface Booking {
   window_count?: number;
   window_scope?: WindowCleaningScope;
   window_screen_track_count?: number;
+  pressure_washing_scope?: PressureWashingScope;
   lawn_mowing_frequency?: LawnMowingFrequency;
   lawn_initial_overgrowth?: boolean;
   lawn_bag_clippings?: boolean;
@@ -96,6 +100,7 @@ export interface BookingForm {
   window_count?: string;
   window_scope?: WindowCleaningScope;
   window_screen_track_count?: string;
+  pressure_washing_scope?: PressureWashingScope;
   lawn_mowing_frequency?: LawnMowingFrequency;
   lawn_initial_overgrowth?: 'yes' | 'no';
   lawn_bag_clippings?: 'yes' | 'no';

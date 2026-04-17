@@ -681,11 +681,11 @@ Proper pool maintenance prevents algae, maintains water chemistry, and extends e
     ],
   },
   pressure_washing: {
-    fullDescription: `Our pressure washing service is focused on driveways and sidewalks only. This is a curb-appeal refresh service designed to remove grime, stains, algae, and surface buildup from concrete and similar durable surfaces.
+    fullDescription: `Our pressure washing service is focused on driveways and walkways only. This is a curb-appeal refresh service designed to remove grime, stains, algae, and surface buildup from concrete and similar durable surfaces.
 
-Typical pricing is $175-$250 for a driveway and $25-$50 for sidewalks, depending on size and condition. We use the customer's water supply, and properties over 1/4 acre may require a custom quote.`,
+  Typical pricing is $175-$250 for a driveway and $25-$50 for a walkway, depending on size and condition. We use the customer's water supply, and normal booking quotes are capped around $350. Properties over 1/4 acre may require a custom quote.`,
     benefits: [
-      'Driveway and sidewalk cleaning in one visit',
+      'Driveway and walkway cleaning in one visit',
       'Removes dirt, algae, mildew, and surface buildup',
       'Improves curb appeal fast',
       'Increases curb appeal dramatically',
@@ -695,21 +695,21 @@ Typical pricing is $175-$250 for a driveway and $25-$50 for sidewalks, depending
       'Uses customer water supply',
     ],
     process: [
-      'Share driveway and sidewalk details when booking',
+      'Share driveway and walkway details when booking',
       'We assess buildup level and surface condition',
       'Pre-treat tougher buildup when needed',
-      'Pressure wash driveway and sidewalks safely',
+      'Pressure wash driveway and walkways safely',
       'Final rinse and walkthrough',
       'Your hard surfaces look clean and refreshed',
     ],
     faqs: [
       {
         question: 'What is included in this service?',
-        answer: 'This pressure washing service is for driveways and sidewalks only.',
+        answer: 'This pressure washing service is for driveways and walkways only.',
       },
       {
         question: 'What are the typical prices?',
-        answer: 'Driveways are typically $175-$250 and sidewalks are typically $25-$50, based on size and condition.',
+        answer: 'Driveways are typically $175-$250 and walkways are typically $25-$50, based on size and condition.',
       },
       {
         question: 'Do you use my water?',

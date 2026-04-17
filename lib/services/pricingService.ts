@@ -2,6 +2,7 @@ import type {
   BookingForm,
   Service,
   ServiceType,
+  PressureWashingScope,
   WindowCleaningScope,
 } from '@/lib/types';
 import { enforceMinimumCustomerPrice } from '@/lib/services/payoutService';
@@ -10,6 +11,10 @@ type WindowCleaningPricingInput = {
   windowCount?: number;
   scope?: WindowCleaningScope;
   screenTrackCount?: number;
+};
+
+type PressureWashingPricingInput = {
+  scope?: PressureWashingScope;
 };
 
 type LawnMowingPricingInput = {
@@ -28,6 +33,7 @@ type EstimateContext = {
   lawnMowing?: LawnMowingPricingInput;
   windowCleaning?: WindowCleaningPricingInput;
   gutterCleaning?: GutterCleaningPricingInput;
+  pressureWashing?: PressureWashingPricingInput;
 };
 
 type PricingRule = {
@@ -114,10 +120,10 @@ export const SERVICE_PRICING: Record<string, PricingRule> = {
   },
   pressure_washing: { 
     name: 'Pressure Washing', 
-    pricePerSqft: 0.30, 
-    minimumPrice: 200,
-    areaBasis: 'property',
-    description: 'Driveway and sidewalk pressure washing. Driveways: $175-$250. Sidewalks: $25-$50. We use the customer\'s water supply.',
+    pricePerSqft: 0,
+    minimumPrice: 175,
+    maximumPrice: 350,
+    description: 'Driveway and walkway pressure washing. Choose driveway, walkway, or both when booking. Driveways: $175-$250. Walkways: $25-$50. We use the customer\'s water supply.',
     images: ['/services/pressure-washing-1.jpg']
   },
 };
@@ -271,9 +277,52 @@ function estimateGutterCleaningPrice(
   return Math.max(baseCharge, 75);
 }
 
+function estimatePressureWashingPrice(
+  propertySqft: number,
+  yardSqft: number,
+  input: PressureWashingPricingInput = {}
+): number {
+  const scope = input.scope || 'both';
+  const footprint = Math.max(propertySqft, yardSqft, 0);
+
+  let drivewayPrice = 175;
+  let walkwayPrice = 25;
+
+  if (footprint >= 1500) {
+    drivewayPrice = 200;
+    walkwayPrice = 35;
+  }
+
+  if (footprint >= 2500) {
+    drivewayPrice = 225;
+    walkwayPrice = 40;
+  }
+
+  if (footprint >= 3500) {
+    drivewayPrice = 250;
+    walkwayPrice = 50;
+  }
+
+  const combinedPrice = scope === 'driveway'
+    ? drivewayPrice
+    : scope === 'walkway'
+      ? walkwayPrice
+      : drivewayPrice + walkwayPrice;
+
+  const scopeAdjustedPrice = scope === 'both' && footprint >= 3500
+    ? combinedPrice * 1.15
+    : combinedPrice;
+
+  return roundToNearestFive(Math.min(350, scopeAdjustedPrice));
+}
+
 export function calculateEstimatePrice(serviceId: string, propertySqft: number, yardSqft: number, context?: EstimateContext): number {
   const pricing = SERVICE_PRICING[serviceId];
   if (!pricing) return 0;
+
+  if (serviceId === 'pressure_washing') {
+    return estimatePressureWashingPrice(propertySqft, yardSqft, context?.pressureWashing);
+  }
 
   if (serviceId === 'window_cleaning') {
     const windowCleaning = context?.windowCleaning || {};

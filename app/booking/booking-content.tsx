@@ -49,6 +49,7 @@ export default function BookingContent() {
     window_count: '',
     window_scope: 'exterior' as 'exterior' | 'interior_exterior',
     window_screen_track_count: '',
+    pressure_washing_scope: 'both' as 'driveway' | 'walkway' | 'both',
     gutter_story_count: '1' as '1' | '2',
     address: '',
     city: '',
@@ -316,6 +317,7 @@ export default function BookingContent() {
           window_count: formData.window_count ? Number(formData.window_count) : undefined,
           window_scope: formData.service_ids.includes('window_cleaning') ? formData.window_scope : undefined,
           window_screen_track_count: formData.window_screen_track_count ? Number(formData.window_screen_track_count) : undefined,
+          pressure_washing_scope: formData.service_ids.includes('pressure_washing') ? formData.pressure_washing_scope : undefined,
           gutter_story_count: formData.service_ids.includes('gutter_cleaning') ? Number(formData.gutter_story_count) : undefined,
         }),
       });
@@ -405,6 +407,7 @@ export default function BookingContent() {
   const includesLawnMowing = selectedServices.some((service) => service.id === 'lawn_mowing');
   const includesWindowCleaning = selectedServices.some((service) => service.id === 'window_cleaning');
   const includesGutterCleaning = selectedServices.some((service) => service.id === 'gutter_cleaning');
+  const includesPressureWashing = selectedServices.some((service) => service.id === 'pressure_washing');
 
   return (
     <main className="page-shell min-h-screen py-12 px-4 sm:px-6 lg:px-8">
@@ -582,6 +585,32 @@ export default function BookingContent() {
                     <option value="1">Single-story</option>
                     <option value="2">Two-story</option>
                   </select>
+                </div>
+              </div>
+            )}
+
+            {includesPressureWashing && (
+              <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Pressure Washing Details</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Choose whether you want the driveway, the walkway, or both cleaned.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <select
+                    name="pressure_washing_scope"
+                    value={formData.pressure_washing_scope}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="driveway">Driveway only</option>
+                    <option value="walkway">Walkway only</option>
+                    <option value="both">Both driveway and walkway</option>
+                  </select>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 leading-6">
+                    Driveway quotes usually run $175-$250, walkway quotes usually run $25-$50, and the normal booking estimate is capped around $350.
+                  </div>
                 </div>
               </div>
             )}
