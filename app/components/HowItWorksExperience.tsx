@@ -4,18 +4,21 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 
-type TaskId = 'lawn' | 'gutters' | 'weeds';
+type TaskId = 'lawn' | 'gutters' | 'wash' | 'weeds';
 
 type SceneData = {
   renderer: THREE.WebGLRenderer;
   camera: THREE.PerspectiveCamera;
   scene: THREE.Scene;
   gutterDebris: THREE.Mesh[];
+  houseWalls: THREE.Mesh;
+  wallStartColor: THREE.Color;
   frameId: number;
 };
 
 let overgrownGrass: THREE.Mesh[] = [];
 let weedClusters: THREE.Mesh[] = [];
+let yardMess: THREE.Mesh[] = [];
 
 function spawnYardMess(scene: THREE.Scene) {
   overgrownGrass = [];
@@ -62,17 +65,155 @@ function spawnYardMess(scene: THREE.Scene) {
   }
 }
 
+function initializeYardState(scene: THREE.Scene) {
+  yardMess = [];
+
+  const isInsideHouseFootprint = (x: number, z: number) => Math.abs(x) < 2.5 && Math.abs(z) < 2.5;
+
+  const randomOpenPosition = (range: number) => {
+    let x = 0;
+    let z = 0;
+
+    do {
+      x = (Math.random() - 0.5) * range;
+      z = (Math.random() - 0.5) * range;
+    } while (isInsideHouseFootprint(x, z));
+
+    return { x, z };
+  };
+
+  const sphereSizes = [0.09, 0.15, 0.24];
+
+  for (let index = 0; index < 40; index += 1) {
+    const useSphere = Math.random() > 0.35;
+
+    const mesh = useSphere
+      ? new THREE.Mesh(
+          new THREE.SphereGeometry(sphereSizes[Math.floor(Math.random() * sphereSizes.length)], 10, 10),
+          new THREE.MeshStandardMaterial({ color: 0x8f7a4c }),
+        )
+      : new THREE.Mesh(
+          new THREE.BoxGeometry(
+            0.12 + Math.random() * 0.32,
+            0.08 + Math.random() * 0.18,
+            0.12 + Math.random() * 0.3,
+          ),
+          new THREE.MeshStandardMaterial({ color: 0x725e39 }),
+        );
+
+    const { x, z } = randomOpenPosition(15);
+    mesh.position.set(x, 0.07 + Math.random() * 0.07, z);
+    mesh.rotation.set(Math.random() * 0.4, Math.random() * 0.45, Math.random() * 0.3);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    yardMess.push(mesh);
+  }
+}
+
+function createSimpleMower() {
+  const mower = new THREE.Group();
+
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.86, 0.28, 0.58),
+    new THREE.MeshStandardMaterial({ color: 0xe44a4a }),
+  );
+  body.position.y = 0.23;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  mower.add(body);
+
+  const wheelGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 14);
+  const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x9fd8ff });
+
+  const frontWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+  frontWheel.rotation.z = Math.PI / 2;
+  frontWheel.position.set(-0.26, 0.08, 0.22);
+  frontWheel.castShadow = true;
+  mower.add(frontWheel);
+
+  const backWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+  backWheel.rotation.z = Math.PI / 2;
+  backWheel.position.set(-0.26, 0.08, -0.22);
+  backWheel.castShadow = true;
+  mower.add(backWheel);
+
+  const handle = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 0.64, 0.06),
+    new THREE.MeshStandardMaterial({ color: 0x4b5a6b }),
+  );
+  handle.position.set(0.38, 0.5, 0);
+  handle.rotation.z = -0.35;
+  handle.castShadow = true;
+  mower.add(handle);
+
+  return mower;
+}
+
+function createDustParticleSystem(scene: THREE.Scene, position: THREE.Vector3, color: number) {
+  const count = 44;
+  const positions = new Float32Array(count * 3);
+
+  for (let index = 0; index < count; index += 1) {
+    const stride = index * 3;
+    positions[stride] = (Math.random() - 0.5) * 0.42;
+    positions[stride + 1] = Math.random() * 0.26;
+    positions[stride + 2] = (Math.random() - 0.5) * 0.3;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+  const material = new THREE.PointsMaterial({
+    color,
+    size: 0.08,
+    opacity: 0.9,
+    transparent: true,
+    depthWrite: false,
+  });
+
+  const points = new THREE.Points(geometry, material);
+  points.position.copy(position);
+  scene.add(points);
+
+  return { points, geometry, material };
+}
+
+function createWaterParticleSystem(scene: THREE.Scene) {
+  const count = 120;
+  const positions = new Float32Array(count * 3);
+
+  for (let index = 0; index < count; index += 1) {
+    const stride = index * 3;
+    positions[stride] = (Math.random() - 0.5) * 0.34;
+    positions[stride + 1] = (Math.random() - 0.5) * 0.34;
+    positions[stride + 2] = (Math.random() - 0.5) * 0.24;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+  const material = new THREE.PointsMaterial({
+    color: 0x9ad7ff,
+    size: 0.07,
+    opacity: 0.9,
+    transparent: true,
+    depthWrite: false,
+  });
+
+  const particles = new THREE.Points(geometry, material);
+  particles.position.set(-2.75, 1.45, 2.15);
+  scene.add(particles);
+
+  return { particles, geometry, material };
+}
+
 const TASKS: Array<{ id: TaskId; label: string; description: string }> = [
   { id: 'lawn', label: 'Lawn Mowing', description: 'Cut long grass down to a clean finish.' },
   { id: 'gutters', label: 'Gutter Cleaning', description: 'Remove leaves and debris from roof edges.' },
+  { id: 'wash', label: 'Exterior Wash', description: 'Spray and brighten the siding surfaces.' },
   { id: 'weeds', label: 'Weed Removal', description: 'Clear visible weed clusters around the lawn.' },
 ];
-
-const taskToProgress: Record<TaskId, number> = {
-  lawn: 33,
-  gutters: 66,
-  weeds: 100,
-};
 
 export default function HowItWorksExperience() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -82,10 +223,12 @@ export default function HowItWorksExperience() {
   const [activeTasks, setActiveTasks] = useState<Record<TaskId, boolean>>({
     lawn: true,
     gutters: true,
+    wash: true,
     weeds: true,
   });
   const [isRunning, setIsRunning] = useState(false);
   const [statusText, setStatusText] = useState('Select services, then click Run Sequence.');
+  const [progressStageLabel, setProgressStageLabel] = useState('Progress');
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -109,6 +252,26 @@ export default function HowItWorksExperience() {
     renderer.setSize(width, height, false);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const skyboxLoader = new THREE.CubeTextureLoader();
+    skyboxLoader.load(
+      [
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/posx.jpg',
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/negx.jpg',
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/posy.jpg',
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/negy.jpg',
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/posz.jpg',
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/negz.jpg',
+      ],
+      (cubeTexture) => {
+        scene.background = cubeTexture;
+        scene.environment = cubeTexture;
+      },
+      undefined,
+      () => {
+        scene.background = new THREE.Color(0x8ec7ff);
+      },
+    );
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1.25);
     directionalLight.position.set(10, 16, 8);
@@ -146,7 +309,7 @@ export default function HowItWorksExperience() {
 
     const walls = new THREE.Mesh(
       new THREE.BoxGeometry(houseWidth, houseHeight, houseDepth),
-      new THREE.MeshStandardMaterial({ color: 0xffffff }),
+      new THREE.MeshStandardMaterial({ color: 0xdad7d0 }),
     );
     walls.position.y = houseHeight / 2;
     walls.castShadow = true;
@@ -191,6 +354,7 @@ export default function HowItWorksExperience() {
     scene.add(house);
 
     spawnYardMess(scene);
+    initializeYardState(scene);
 
     const gutterDebris: THREE.Mesh[] = [];
     const debrisGeometry = new THREE.BoxGeometry(0.32, 0.16, 0.24);
@@ -229,6 +393,8 @@ export default function HowItWorksExperience() {
       camera,
       scene,
       gutterDebris,
+      houseWalls: walls,
+      wallStartColor: walls.material.color.clone(),
       frameId: 0,
     };
     frameId = window.requestAnimationFrame(animate);
@@ -248,6 +414,9 @@ export default function HowItWorksExperience() {
       window.cancelAnimationFrame(frameId);
       renderer.dispose();
       sceneDataRef.current = null;
+      overgrownGrass = [];
+      weedClusters = [];
+      yardMess = [];
 
       scene.traverse((item) => {
         const mesh = item as THREE.Mesh;
@@ -287,13 +456,32 @@ export default function HowItWorksExperience() {
       }
 
       setStatusText('Lawn mowing in progress...');
+      setProgressStageLabel('Mowing Lawn...');
 
-      gsap.to(overgrownGrass.map((mesh) => mesh.scale), {
-        y: 0.1,
-        duration: 2,
-        stagger: 0.03,
-        onComplete: resolve,
+      const mower = createSimpleMower();
+      mower.position.set(-7.2, 0, -6.6);
+      sceneData.scene.add(mower);
+
+      const grassTween = gsap.to(overgrownGrass.map((mesh) => mesh.scale), {
+        y: 0.12,
+        duration: 3.2,
+        stagger: 0.02,
+        ease: 'power1.inOut',
       });
+
+      gsap.timeline({
+        onComplete: () => {
+          grassTween.kill();
+          sceneData.scene.remove(mower);
+          setActiveTasks((current) => ({ ...current, lawn: false }));
+          resolve();
+        },
+      })
+        .to(mower.position, { x: 7.2, z: -6.6, duration: 0.64, ease: 'none' })
+        .to(mower.position, { x: -7.2, z: -3.3, duration: 0.64, ease: 'none' })
+        .to(mower.position, { x: 7.2, z: -0.1, duration: 0.64, ease: 'none' })
+        .to(mower.position, { x: -7.2, z: 3.1, duration: 0.64, ease: 'none' })
+        .to(mower.position, { x: 7.2, z: 6.2, duration: 0.64, ease: 'none' });
     });
   };
 
@@ -306,17 +494,105 @@ export default function HowItWorksExperience() {
       }
 
       setStatusText('Gutter cleaning in progress...');
+      setProgressStageLabel('Cleaning Gutters...');
+
+      const dustBursts = [
+        createDustParticleSystem(sceneData.scene, new THREE.Vector3(-1.4, 2.6, 1.45), 0x8a6b49),
+        createDustParticleSystem(sceneData.scene, new THREE.Vector3(0.2, 2.65, 1.45), 0xa3a3a3),
+        createDustParticleSystem(sceneData.scene, new THREE.Vector3(1.2, 2.6, -1.45), 0x7e5d42),
+      ];
+
+      dustBursts.forEach(({ points, material }) => {
+        gsap.to(points.position, {
+          y: 0.2,
+          duration: 1,
+          ease: 'power1.in',
+        });
+        gsap.to(material, {
+          opacity: 0,
+          duration: 1,
+          ease: 'power1.out',
+        });
+      });
 
       gsap.to(sceneData.gutterDebris.map((mesh) => mesh.scale), {
         x: 0.01,
         y: 0.01,
         z: 0.01,
-        duration: 1.4,
+        duration: 1.45,
         stagger: 0.05,
         onComplete: () => {
           sceneData.gutterDebris.forEach((debris) => {
             debris.visible = false;
           });
+
+          dustBursts.forEach(({ points, geometry, material }) => {
+            sceneData.scene.remove(points);
+            geometry.dispose();
+            material.dispose();
+          });
+
+          setActiveTasks((current) => ({ ...current, gutters: false }));
+          resolve();
+        },
+      });
+    });
+  };
+
+  const runExteriorWashTask = () => {
+    return new Promise<void>((resolve) => {
+      const sceneData = sceneDataRef.current;
+      if (!sceneData || !activeTasks.wash) {
+        resolve();
+        return;
+      }
+
+      setStatusText('Exterior washing in progress...');
+      setProgressStageLabel('Washing House...');
+
+      const sprayer = new THREE.Mesh(
+        new THREE.ConeGeometry(0.2, 0.72, 16),
+        new THREE.MeshStandardMaterial({
+          color: 0x4ea8ff,
+          emissive: 0x1d6db8,
+          emissiveIntensity: 0.35,
+        }),
+      );
+      sprayer.position.set(-2.8, 1.02, 2.15);
+      sprayer.rotation.z = -Math.PI / 2;
+      sprayer.rotation.y = 0.3;
+      sprayer.castShadow = true;
+      sceneData.scene.add(sprayer);
+
+      const { particles, geometry, material } = createWaterParticleSystem(sceneData.scene);
+      const wallMaterial = sceneData.houseWalls.material as THREE.MeshStandardMaterial;
+
+      gsap.to(particles.position, {
+        x: -0.45,
+        y: 1.55,
+        z: 1.62,
+        duration: 3,
+        ease: 'power1.inOut',
+      });
+
+      gsap.to(material, {
+        opacity: 0.1,
+        duration: 3,
+        ease: 'power1.out',
+      });
+
+      gsap.to(wallMaterial.color, {
+        r: 1,
+        g: 1,
+        b: 1,
+        duration: 3,
+        ease: 'power1.inOut',
+        onComplete: () => {
+          sceneData.scene.remove(sprayer);
+          sceneData.scene.remove(particles);
+          geometry.dispose();
+          material.dispose();
+          setActiveTasks((current) => ({ ...current, wash: false }));
           resolve();
         },
       });
@@ -332,14 +608,18 @@ export default function HowItWorksExperience() {
       }
 
       setStatusText('Weed removal in progress...');
+      setProgressStageLabel('Removing Weeds...');
 
-      gsap.to(weedClusters.map((mesh) => mesh.scale), {
+      gsap.to([...weedClusters, ...yardMess].map((mesh) => mesh.scale), {
         y: 0.01,
         x: 0.01,
         z: 0.01,
         duration: 1.6,
         stagger: 0.03,
-        onComplete: resolve,
+        onComplete: () => {
+          setActiveTasks((current) => ({ ...current, weeds: false }));
+          resolve();
+        },
       });
     });
   };
@@ -365,10 +645,20 @@ export default function HowItWorksExperience() {
       mesh.scale.set(1, 1, 1);
     });
 
+    yardMess.forEach((mesh) => {
+      mesh.visible = true;
+      mesh.scale.set(1, 1, 1);
+    });
+
+    const wallMaterial = sceneData.houseWalls.material as THREE.MeshStandardMaterial;
+    wallMaterial.color.copy(sceneData.wallStartColor);
+
     if (progressRef.current) {
       gsap.set(progressRef.current, { width: '0%' });
     }
 
+    setActiveTasks({ lawn: true, gutters: true, wash: true, weeds: true });
+    setProgressStageLabel('Progress');
     setStatusText('Scene reset. Select services, then click Run Sequence.');
   };
 
@@ -377,26 +667,39 @@ export default function HowItWorksExperience() {
       return;
     }
 
+    const sequenceOrder: Array<{ id: TaskId; run: () => Promise<void> }> = [
+      { id: 'lawn', run: runLawnMowingTask },
+      { id: 'gutters', run: runGutterTask },
+      { id: 'wash', run: runExteriorWashTask },
+      { id: 'weeds', run: runWeedTask },
+    ];
+
+    const enabledTasks = sequenceOrder.filter((entry) => activeTasks[entry.id]);
+
+    if (enabledTasks.length === 0) {
+      setStatusText('Select at least one service to run.');
+      return;
+    }
+
     setIsRunning(true);
     setStatusText('Starting service sequence...');
+    setProgressStageLabel('Starting...');
+
+    if (progressRef.current) {
+      gsap.set(progressRef.current, { width: '0%' });
+    }
 
     try {
-      await runLawnMowingTask();
-      if (activeTasks.lawn) {
-        await updateProgress(taskToProgress.lawn);
-      }
-
-      await runGutterTask();
-      if (activeTasks.gutters) {
-        await updateProgress(taskToProgress.gutters);
-      }
-
-      await runWeedTask();
-      if (activeTasks.weeds) {
-        await updateProgress(taskToProgress.weeds);
+      let completeCount = 0;
+      for (const task of enabledTasks) {
+        await task.run();
+        completeCount += 1;
+        const target = Math.round((completeCount / enabledTasks.length) * 100);
+        await updateProgress(target);
       }
 
       setStatusText('Sequence complete. Your property looks clean.');
+      setProgressStageLabel('Job Complete! Ready for Booking.');
     } finally {
       setIsRunning(false);
     }
@@ -450,6 +753,7 @@ export default function HowItWorksExperience() {
           </button>
 
           <p className="hiw-status-text">{statusText}</p>
+          <p className="hiw-status-text">{progressStageLabel}</p>
 
           <div className="hiw-progress-track" aria-label="Progress track">
             <div id="progress-bar" ref={progressRef} className="hiw-progress-bar" />
