@@ -244,6 +244,23 @@ export default function HowItWorksExperience() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    const textureLoader = new THREE.TextureLoader();
+    const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+
+    const grassTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
+    grassTexture.wrapS = THREE.RepeatWrapping;
+    grassTexture.wrapT = THREE.RepeatWrapping;
+    grassTexture.repeat.set(8, 8);
+    grassTexture.colorSpace = THREE.SRGBColorSpace;
+    grassTexture.anisotropy = maxAnisotropy;
+
+    const roofTexture = textureLoader.load('https://threejs.org/examples/textures/brick_diffuse.jpg');
+    roofTexture.wrapS = THREE.RepeatWrapping;
+    roofTexture.wrapT = THREE.RepeatWrapping;
+    roofTexture.repeat.set(4, 2);
+    roofTexture.colorSpace = THREE.SRGBColorSpace;
+    roofTexture.anisotropy = maxAnisotropy;
+
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1.25);
     directionalLight.position.set(10, 16, 8);
     directionalLight.castShadow = true;
@@ -265,7 +282,7 @@ export default function HowItWorksExperience() {
 
     const lawn = new THREE.Mesh(
       new THREE.BoxGeometry(20, 1, 20),
-      new THREE.MeshStandardMaterial({ color: 0x47a447 }),
+      new THREE.MeshStandardMaterial({ map: grassTexture, color: 0x9bcf8c }),
     );
     lawn.position.y = -0.5;
     lawn.castShadow = true;
@@ -299,7 +316,7 @@ export default function HowItWorksExperience() {
     const roofHeight = 1.4;
     const roof = new THREE.Mesh(
       new THREE.ConeGeometry(houseWidth * 0.9, roofHeight, 4),
-      new THREE.MeshStandardMaterial({ color: 0x7a4e2c }),
+      new THREE.MeshStandardMaterial({ map: roofTexture, color: 0x5b3a25 }),
     );
     roof.position.y = houseHeight + roofHeight / 2;
     roof.rotation.y = Math.PI / 4;
@@ -359,11 +376,17 @@ export default function HowItWorksExperience() {
     });
 
     let frameId = 0;
+    let orbitAngle = 0;
+    const orbitRadius = 12;
+    const orbitSpeed = 0.14;
+    const orbitTarget = new THREE.Vector3(0, houseHeight / 2, 0);
 
     const animate = () => {
-      camera.position.x = Math.cos(Date.now() * 0.0002) * 10;
-      camera.position.z = Math.sin(Date.now() * 0.0002) * 10;
-      camera.lookAt(0, 1, 0);
+      orbitAngle += orbitSpeed * 0.016;
+      camera.position.x = Math.cos(orbitAngle) * orbitRadius;
+      camera.position.z = Math.sin(orbitAngle) * orbitRadius;
+      camera.position.y = 6.6;
+      camera.lookAt(orbitTarget);
       renderer.render(scene, camera);
       frameId = window.requestAnimationFrame(animate);
     };
@@ -439,29 +462,47 @@ export default function HowItWorksExperience() {
       setProgressStageLabel('Mowing Lawn...');
 
       const mower = createSimpleMower();
-      mower.position.set(-7.2, 0, -6.6);
+      mower.position.set(-12.8, 0, -6.8);
+      mower.rotation.y = 0.16;
       sceneData.scene.add(mower);
 
       const grassTween = gsap.to(overgrownGrass.map((mesh) => mesh.scale), {
         y: 0.12,
-        duration: 3.2,
+        duration: 4.8,
         stagger: 0.02,
         ease: 'power1.inOut',
+      });
+
+      const bobTween = gsap.to(mower.position, {
+        y: 0.08,
+        duration: 0.28,
+        ease: 'sine.inOut',
+        repeat: -1,
+        yoyo: true,
       });
 
       gsap.timeline({
         onComplete: () => {
           grassTween.kill();
+          bobTween.kill();
           sceneData.scene.remove(mower);
           setActiveTasks((current) => ({ ...current, lawn: false }));
           resolve();
         },
       })
-        .to(mower.position, { x: 7.2, z: -6.6, duration: 0.64, ease: 'none' })
-        .to(mower.position, { x: -7.2, z: -3.3, duration: 0.64, ease: 'none' })
-        .to(mower.position, { x: 7.2, z: -0.1, duration: 0.64, ease: 'none' })
-        .to(mower.position, { x: -7.2, z: 3.1, duration: 0.64, ease: 'none' })
-        .to(mower.position, { x: 7.2, z: 6.2, duration: 0.64, ease: 'none' });
+        .to(mower.position, { x: -7.4, z: -6.6, duration: 0.62, ease: 'power2.out' })
+        .to(mower.rotation, { y: 0.02, duration: 0.2, ease: 'sine.inOut' }, '<')
+        .to(mower.position, { x: 7.2, z: -6.6, duration: 0.74, ease: 'sine.inOut' })
+        .to(mower.rotation, { y: -0.08, duration: 0.2, ease: 'sine.inOut' }, '<')
+        .to(mower.position, { x: -7.2, z: -3.4, duration: 0.74, ease: 'sine.inOut' })
+        .to(mower.rotation, { y: 0.08, duration: 0.2, ease: 'sine.inOut' }, '<')
+        .to(mower.position, { x: 7.2, z: -0.2, duration: 0.74, ease: 'sine.inOut' })
+        .to(mower.rotation, { y: -0.08, duration: 0.2, ease: 'sine.inOut' }, '<')
+        .to(mower.position, { x: -7.2, z: 3.0, duration: 0.74, ease: 'sine.inOut' })
+        .to(mower.rotation, { y: 0.08, duration: 0.2, ease: 'sine.inOut' }, '<')
+        .to(mower.position, { x: 7.2, z: 6.1, duration: 0.74, ease: 'sine.inOut' })
+        .to(mower.rotation, { y: -0.02, duration: 0.2, ease: 'sine.inOut' }, '<')
+        .to(mower.position, { x: 13.2, z: 6.5, duration: 0.62, ease: 'power2.in' });
     });
   };
 
@@ -610,36 +651,59 @@ export default function HowItWorksExperience() {
       setStatusText('Exterior washing in progress...');
       setProgressStageLabel('Washing House...');
 
-      const sprayer = new THREE.Mesh(
-        new THREE.ConeGeometry(0.2, 0.72, 16),
-        new THREE.MeshStandardMaterial({
-          color: 0x4ea8ff,
-          emissive: 0x1d6db8,
-          emissiveIntensity: 0.35,
-        }),
-      );
-      sprayer.position.set(-2.8, 1.02, 2.15);
-      sprayer.rotation.z = -Math.PI / 2;
-      sprayer.rotation.y = 0.3;
-      sprayer.castShadow = true;
-      sceneData.scene.add(sprayer);
+      const sprayGroup = new THREE.Group();
+      const particleGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+      const particleMaterial = new THREE.MeshStandardMaterial({
+        color: 0x53b8ff,
+        emissive: 0x1f7bc8,
+        emissiveIntensity: 0.3,
+      });
 
-      const { particles, geometry, material } = createWaterParticleSystem(sceneData.scene);
+      const sprayOrigin = new THREE.Vector3(-2.7, 1.35, 2.1);
+
+      for (let index = 0; index < 44; index += 1) {
+        const drop = new THREE.Mesh(particleGeometry, particleMaterial);
+        drop.position.set(
+          sprayOrigin.x + (Math.random() - 0.5) * 0.25,
+          sprayOrigin.y + (Math.random() - 0.5) * 0.25,
+          sprayOrigin.z + (Math.random() - 0.5) * 0.2,
+        );
+        drop.castShadow = true;
+        sprayGroup.add(drop);
+      }
+
+      sceneData.scene.add(sprayGroup);
+
+      sprayGroup.children.forEach((child, index) => {
+        const mesh = child as THREE.Mesh;
+        const targetX = -0.9 + Math.random() * 2.1;
+        const targetY = 0.9 + Math.random() * 1.8;
+        const targetZ = 1.55;
+
+        gsap.to(mesh.position, {
+          x: targetX,
+          y: targetY,
+          z: targetZ,
+          duration: 0.75,
+          delay: index * 0.018,
+          repeat: 2,
+          repeatRefresh: true,
+          ease: 'power1.out',
+        });
+
+        gsap.to(mesh.scale, {
+          x: 0.65,
+          y: 0.65,
+          z: 0.65,
+          duration: 0.55,
+          yoyo: true,
+          repeat: 5,
+          ease: 'sine.inOut',
+        });
+      });
+
       const wallMaterial = sceneData.houseWalls.material as THREE.MeshStandardMaterial;
-
-      gsap.to(particles.position, {
-        x: -0.45,
-        y: 1.55,
-        z: 1.62,
-        duration: 3,
-        ease: 'power1.inOut',
-      });
-
-      gsap.to(material, {
-        opacity: 0.1,
-        duration: 3,
-        ease: 'power1.out',
-      });
+      wallMaterial.color.set(0x666666);
 
       gsap.to(wallMaterial.color, {
         r: 1,
@@ -648,10 +712,9 @@ export default function HowItWorksExperience() {
         duration: 3,
         ease: 'power1.inOut',
         onComplete: () => {
-          sceneData.scene.remove(sprayer);
-          sceneData.scene.remove(particles);
-          geometry.dispose();
-          material.dispose();
+          sceneData.scene.remove(sprayGroup);
+          particleGeometry.dispose();
+          particleMaterial.dispose();
           setActiveTasks((current) => ({ ...current, wash: false }));
           resolve();
         },
