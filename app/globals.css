@@ -710,3 +710,154 @@ textarea {
     animation: none;
   }
 }
+
+.hiw-app {
+  width: 100%;
+}
+
+.hiw-main-container {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: min(78vh, 760px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1.2rem;
+  box-shadow: 0 18px 34px -24px rgba(17, 32, 24, 0.55);
+  background: #d8e9dc;
+}
+
+.hiw-canvas-shell {
+  width: 70%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+#webgl-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #bde0ff;
+}
+
+.hiw-sidebar {
+  width: 30%;
+  min-width: 300px;
+  height: 100%;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  background: linear-gradient(180deg, #102318, #193022);
+  color: #eaf8ef;
+}
+
+.hiw-sidebar-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.hiw-sidebar-subtitle {
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: #c8e2d1;
+}
+
+.hiw-toggle-btn {
+  width: 100%;
+  border: 1px solid #345747;
+  border-radius: 0.72rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e5f6ea;
+  text-align: left;
+  padding: 0.68rem 0.72rem;
+  cursor: pointer;
+  display: grid;
+  gap: 0.24rem;
+}
+
+.hiw-toggle-btn span {
+  font-weight: 700;
+}
+
+.hiw-toggle-btn small {
+  font-size: 0.76rem;
+  color: #c5dece;
+}
+
+.hiw-toggle-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #73b58f;
+}
+
+.hiw-toggle-btn.active {
+  background: linear-gradient(135deg, rgba(34, 122, 67, 0.65), rgba(59, 171, 98, 0.58));
+  border-color: #7bd59f;
+}
+
+.hiw-run-sequence-btn {
+  margin-top: 0.45rem;
+  border: none;
+  border-radius: 0.72rem;
+  padding: 0.72rem 0.8rem;
+  font-weight: 800;
+  color: #0e2919;
+  background: linear-gradient(135deg, #87f1a9, #34c774);
+  cursor: pointer;
+  box-shadow: 0 10px 20px -14px rgba(90, 227, 141, 0.8);
+}
+
+.hiw-run-sequence-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.hiw-reset-btn {
+  border-radius: 0.72rem;
+  border: 1px solid #5f806d;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e7f5eb;
+  padding: 0.62rem 0.76rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.hiw-status-text {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #c1dbc9;
+  margin-top: 0.25rem;
+}
+
+.hiw-progress-track {
+  margin-top: auto;
+  width: 100%;
+  height: 14px;
+  border: 1px solid #5f806d;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.hiw-progress-bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #9be163);
+}
+
+@media (max-width: 1024px) {
+  .hiw-main-container {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .hiw-canvas-shell,
+  .hiw-sidebar {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .hiw-canvas-shell {
+    height: 55vh;
+  }
+}

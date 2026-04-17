@@ -1,261 +1,412 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
+import { gsap } from 'gsap';
 
-type TaskId = 'lawn' | 'gutters' | 'weeds' | 'wash' | 'hedges';
-type TaskStatus = 'pending' | 'active' | 'done';
+type TaskId = 'lawn' | 'gutters' | 'weeds';
 
-type TaskConfig = {
-  id: TaskId;
-  label: string;
-  detail: string;
-  seconds: number;
+type SceneData = {
+  renderer: THREE.WebGLRenderer;
+  camera: THREE.PerspectiveCamera;
+  scene: THREE.Scene;
+  overgrownGrass: THREE.Mesh[];
+  gutterDebris: THREE.Mesh[];
+  weeds: THREE.Mesh[];
+  frameId: number;
 };
 
-const TASKS: TaskConfig[] = [
-  { id: 'lawn', label: 'Lawn mowing', detail: 'Cut long grass and stripe the yard.', seconds: 10 },
-  { id: 'gutters', label: 'Gutter cleaning', detail: 'Clear leaves and grime from gutters.', seconds: 9 },
-  { id: 'weeds', label: 'Weed removal', detail: 'Pull and treat visible weed zones.', seconds: 8 },
-  { id: 'wash', label: 'Exterior wash', detail: 'Pressure-wash dirty siding surfaces.', seconds: 10 },
-  { id: 'hedges', label: 'Hedge trimming', detail: 'Shape overgrown hedges and edges.', seconds: 9 },
+const TASKS: Array<{ id: TaskId; label: string; description: string }> = [
+  { id: 'lawn', label: 'Lawn Mowing', description: 'Cut long grass down to a clean finish.' },
+  { id: 'gutters', label: 'Gutter Cleaning', description: 'Remove leaves and debris from roof edges.' },
+  { id: 'weeds', label: 'Weed Removal', description: 'Clear visible weed clusters around the lawn.' },
 ];
 
-const TICK_MS = 120;
+const taskToProgress: Record<TaskId, number> = {
+  lawn: 33,
+  gutters: 66,
+  weeds: 100,
+};
 
 export default function HowItWorksExperience() {
-  const [selected, setSelected] = useState<TaskId[]>(['lawn', 'gutters', 'weeds']);
-  const [progress, setProgress] = useState(0);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const sceneDataRef = useRef<SceneData | null>(null);
+  const progressRef = useRef<HTMLDivElement | null>(null);
+
+  const [activeTasks, setActiveTasks] = useState<Record<TaskId, boolean>>({
+    lawn: true,
+    gutters: true,
+    weeds: true,
+  });
   const [isRunning, setIsRunning] = useState(false);
-
-  const selectedTasks = useMemo(
-    () => TASKS.filter((task) => selected.includes(task.id)),
-    [selected],
-  );
-
-  const totalMs = useMemo(
-    () => selectedTasks.reduce((sum, task) => sum + task.seconds * 1000, 0),
-    [selectedTasks],
-  );
+  const [statusText, setStatusText] = useState('Select services, then click Run Sequence.');
 
   useEffect(() => {
-    if (!isRunning || totalMs <= 0) {
+    const canvas = canvasRef.current;
+    if (!canvas) {
       return;
     }
 
-    const startedAt = Date.now() - (progress / 100) * totalMs;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x8ec7ff);
 
-    const timer = window.setInterval(() => {
-      const elapsed = Date.now() - startedAt;
-      const nextProgress = Math.min(100, (elapsed / totalMs) * 100);
-      setProgress(nextProgress);
+    const parent = canvas.parentElement;
+    const width = Math.max(parent?.clientWidth ?? 0, 100);
+    const height = Math.max(parent?.clientHeight ?? 0, 100);
 
-      if (nextProgress >= 100) {
-        setIsRunning(false);
+    const camera = new THREE.PerspectiveCamera(58, width / height, 0.1, 1000);
+    camera.position.set(9, 7, 10);
+    camera.lookAt(0, 1, 0);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(width, height, false);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.25);
+    directionalLight.position.set(10, 16, 8);
+    scene.add(directionalLight);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
+    scene.add(ambientLight);
+
+    const lawn = new THREE.Mesh(
+      new THREE.BoxGeometry(20, 1, 20),
+      new THREE.MeshStandardMaterial({ color: 0x47a447 }),
+    );
+    lawn.position.y = -0.5;
+    scene.add(lawn);
+
+    const house = new THREE.Group();
+
+    const walls = new THREE.Mesh(
+      new THREE.BoxGeometry(3.2, 2.2, 3),
+      new THREE.MeshStandardMaterial({ color: 0xffffff }),
+    );
+    walls.position.y = 1.1;
+    house.add(walls);
+
+    const roofLeft = new THREE.Mesh(
+      new THREE.BoxGeometry(3.4, 0.2, 1.9),
+      new THREE.MeshStandardMaterial({ color: 0x7a4e2c }),
+    );
+    roofLeft.position.set(0, 2.4, -0.5);
+    roofLeft.rotation.x = 0.5;
+    house.add(roofLeft);
+
+    const roofRight = new THREE.Mesh(
+      new THREE.BoxGeometry(3.4, 0.2, 1.9),
+      new THREE.MeshStandardMaterial({ color: 0x7a4e2c }),
+    );
+    roofRight.position.set(0, 2.4, 0.5);
+    roofRight.rotation.x = -0.5;
+    house.add(roofRight);
+
+    scene.add(house);
+
+    const overgrownGrass: THREE.Mesh[] = [];
+    const grassGeometry = new THREE.CylinderGeometry(0.06, 0.08, 1.0, 7);
+    const grassMaterial = new THREE.MeshStandardMaterial({ color: 0x1f8f35 });
+
+    for (let index = 0; index < 50; index += 1) {
+      const grass = new THREE.Mesh(grassGeometry, grassMaterial);
+      let x = (Math.random() - 0.5) * 17;
+      let z = (Math.random() - 0.5) * 17;
+
+      if (Math.abs(x) < 2.4 && Math.abs(z) < 2.3) {
+        x += x >= 0 ? 3.1 : -3.1;
+        z += z >= 0 ? 3.1 : -3.1;
       }
-    }, TICK_MS);
 
-    return () => window.clearInterval(timer);
-  }, [isRunning, totalMs, progress]);
+      grass.position.set(x, 0.5, z);
+      scene.add(grass);
+      overgrownGrass.push(grass);
+    }
 
-  const taskStatuses = useMemo<Record<TaskId, TaskStatus>>(() => {
-    const statuses: Record<TaskId, TaskStatus> = {
-      lawn: 'pending',
-      gutters: 'pending',
-      weeds: 'pending',
-      wash: 'pending',
-      hedges: 'pending',
+    const gutterDebris: THREE.Mesh[] = [];
+    const debrisGeometry = new THREE.BoxGeometry(0.32, 0.16, 0.24);
+    const debrisMaterial = new THREE.MeshStandardMaterial({ color: 0x70412a });
+    const debrisPositions = [
+      [-1.4, 2.38, -1.45],
+      [-0.7, 2.4, -1.45],
+      [0.1, 2.38, -1.45],
+      [0.9, 2.4, -1.45],
+      [-1.3, 2.38, 1.45],
+      [-0.5, 2.4, 1.45],
+      [0.3, 2.38, 1.45],
+      [1.1, 2.4, 1.45],
+    ];
+
+    debrisPositions.forEach(([x, y, z]) => {
+      const debris = new THREE.Mesh(debrisGeometry, debrisMaterial);
+      debris.position.set(x, y, z);
+      debris.rotation.set(Math.random() * 0.4, Math.random() * 0.5, Math.random() * 0.3);
+      scene.add(debris);
+      gutterDebris.push(debris);
+    });
+
+    const weeds: THREE.Mesh[] = [];
+    const weedGeometry = new THREE.SphereGeometry(0.12, 12, 12);
+    const weedMaterial = new THREE.MeshStandardMaterial({ color: 0xd8cc45 });
+
+    for (let index = 0; index < 28; index += 1) {
+      const weed = new THREE.Mesh(weedGeometry, weedMaterial);
+      let x = (Math.random() - 0.5) * 14;
+      let z = (Math.random() - 0.5) * 14;
+
+      if (Math.abs(x) < 2.2 && Math.abs(z) < 2.2) {
+        x += x >= 0 ? 2.8 : -2.8;
+        z += z >= 0 ? 2.8 : -2.8;
+      }
+
+      weed.position.set(x, 0.12, z);
+      scene.add(weed);
+      weeds.push(weed);
+    }
+
+    let frameId = 0;
+
+    const animate = () => {
+      camera.position.x = Math.cos(Date.now() * 0.0002) * 10;
+      camera.position.z = Math.sin(Date.now() * 0.0002) * 10;
+      camera.lookAt(0, 1, 0);
+      renderer.render(scene, camera);
+      frameId = window.requestAnimationFrame(animate);
     };
 
-    if (selectedTasks.length === 0) {
-      return statuses;
-    }
+    sceneDataRef.current = {
+      renderer,
+      camera,
+      scene,
+      overgrownGrass,
+      gutterDebris,
+      weeds,
+      frameId: 0,
+    };
+    frameId = window.requestAnimationFrame(animate);
 
-    if (!isRunning && progress >= 100) {
-      selectedTasks.forEach((task) => {
-        statuses[task.id] = 'done';
+    const onResize = () => {
+      const nextWidth = Math.max(parent?.clientWidth ?? 0, 100);
+      const nextHeight = Math.max(parent?.clientHeight ?? 0, 100);
+      camera.aspect = nextWidth / nextHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(nextWidth, nextHeight, false);
+    };
+
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.cancelAnimationFrame(frameId);
+      renderer.dispose();
+      sceneDataRef.current = null;
+
+      scene.traverse((item) => {
+        const mesh = item as THREE.Mesh;
+        if (mesh.geometry) {
+          mesh.geometry.dispose();
+        }
+
+        if (mesh.material) {
+          const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          materials.forEach((material) => material.dispose());
+        }
       });
-      return statuses;
+    };
+  }, []);
+
+  const updateProgress = (value: number) => {
+    if (!progressRef.current) {
+      return Promise.resolve();
     }
 
-    const elapsedMs = (progress / 100) * totalMs;
-    let cursor = 0;
+    return new Promise<void>((resolve) => {
+      gsap.to(progressRef.current, {
+        width: `${value}%`,
+        duration: 0.35,
+        ease: 'power1.out',
+        onComplete: resolve,
+      });
+    });
+  };
 
-    for (const task of selectedTasks) {
-      const taskMs = task.seconds * 1000;
-      const end = cursor + taskMs;
-
-      if (elapsedMs >= end) {
-        statuses[task.id] = 'done';
-      } else if (elapsedMs >= cursor) {
-        statuses[task.id] = 'active';
+  const runLawnMowingTask = () => {
+    return new Promise<void>((resolve) => {
+      const sceneData = sceneDataRef.current;
+      if (!sceneData || !activeTasks.lawn) {
+        resolve();
+        return;
       }
 
-      cursor = end;
+      setStatusText('Lawn mowing in progress...');
+
+      gsap.to(sceneData.overgrownGrass.map((mesh) => mesh.scale), {
+        y: 0.1,
+        duration: 2,
+        stagger: 0.03,
+        onComplete: resolve,
+      });
+    });
+  };
+
+  const runGutterTask = () => {
+    return new Promise<void>((resolve) => {
+      const sceneData = sceneDataRef.current;
+      if (!sceneData || !activeTasks.gutters) {
+        resolve();
+        return;
+      }
+
+      setStatusText('Gutter cleaning in progress...');
+
+      gsap.to(sceneData.gutterDebris.map((mesh) => mesh.scale), {
+        x: 0.01,
+        y: 0.01,
+        z: 0.01,
+        duration: 1.4,
+        stagger: 0.05,
+        onComplete: () => {
+          sceneData.gutterDebris.forEach((debris) => {
+            debris.visible = false;
+          });
+          resolve();
+        },
+      });
+    });
+  };
+
+  const runWeedTask = () => {
+    return new Promise<void>((resolve) => {
+      const sceneData = sceneDataRef.current;
+      if (!sceneData || !activeTasks.weeds) {
+        resolve();
+        return;
+      }
+
+      setStatusText('Weed removal in progress...');
+
+      gsap.to(sceneData.weeds.map((mesh) => mesh.scale), {
+        y: 0.01,
+        x: 0.01,
+        z: 0.01,
+        duration: 1.6,
+        stagger: 0.03,
+        onComplete: resolve,
+      });
+    });
+  };
+
+  const resetScene = () => {
+    const sceneData = sceneDataRef.current;
+    if (!sceneData) {
+      return;
     }
 
-    return statuses;
-  }, [isRunning, progress, selectedTasks, totalMs]);
+    sceneData.overgrownGrass.forEach((mesh) => {
+      mesh.visible = true;
+      mesh.scale.set(1, 1, 1);
+    });
 
-  const activeTask = useMemo(() => {
-    const found = selectedTasks.find((task) => taskStatuses[task.id] === 'active');
-    return found?.id ?? null;
-  }, [selectedTasks, taskStatuses]);
+    sceneData.gutterDebris.forEach((mesh) => {
+      mesh.visible = true;
+      mesh.scale.set(1, 1, 1);
+    });
 
-  const completedCount = selectedTasks.filter((task) => taskStatuses[task.id] === 'done').length;
+    sceneData.weeds.forEach((mesh) => {
+      mesh.visible = true;
+      mesh.scale.set(1, 1, 1);
+    });
+
+    if (progressRef.current) {
+      gsap.set(progressRef.current, { width: '0%' });
+    }
+
+    setStatusText('Scene reset. Select services, then click Run Sequence.');
+  };
+
+  const runSequence = async () => {
+    if (isRunning) {
+      return;
+    }
+
+    setIsRunning(true);
+    setStatusText('Starting service sequence...');
+
+    try {
+      await runLawnMowingTask();
+      if (activeTasks.lawn) {
+        await updateProgress(taskToProgress.lawn);
+      }
+
+      await runGutterTask();
+      if (activeTasks.gutters) {
+        await updateProgress(taskToProgress.gutters);
+      }
+
+      await runWeedTask();
+      if (activeTasks.weeds) {
+        await updateProgress(taskToProgress.weeds);
+      }
+
+      setStatusText('Sequence complete. Your property looks clean.');
+    } finally {
+      setIsRunning(false);
+    }
+  };
 
   const toggleTask = (id: TaskId) => {
     if (isRunning) {
       return;
     }
 
-    setProgress(0);
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((entry) => entry !== id) : [...prev, id],
-    );
+    setActiveTasks((current) => ({
+      ...current,
+      [id]: !current[id],
+    }));
   };
-
-  const startDemo = () => {
-    if (selectedTasks.length === 0) {
-      return;
-    }
-
-    setProgress(0);
-    setIsRunning(true);
-  };
-
-  const resetDemo = () => {
-    setIsRunning(false);
-    setProgress(0);
-  };
-
-  const done = !isRunning && progress >= 100 && selectedTasks.length > 0;
 
   return (
-    <div className="how-shell mt-8 grid gap-7 xl:grid-cols-[1.08fr_0.92fr]">
-      <section className="scene-card">
-        <div className="scene-header">
-          <p className="scene-kicker">Interactive home cleanup preview</p>
-          <h2 className="scene-title">Pick tasks and watch your property transform</h2>
-          <p className="scene-subtitle">
-            Start with an overgrown, dirty house and see each selected service complete in sequence.
-          </p>
+    <div className="hiw-app mt-8">
+      <div className="hiw-main-container">
+        <div className="hiw-canvas-shell">
+          <canvas id="webgl-canvas" ref={canvasRef} />
         </div>
 
-        <div
-          className={[
-            'house-scene',
-            taskStatuses.lawn === 'done' ? 'lawn-done' : '',
-            taskStatuses.gutters === 'done' ? 'gutters-done' : '',
-            taskStatuses.weeds === 'done' ? 'weeds-done' : '',
-            taskStatuses.wash === 'done' ? 'wash-done' : '',
-            taskStatuses.hedges === 'done' ? 'hedges-done' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
-          <div className="sky-glow" />
+        <aside className="hiw-sidebar">
+          <h3 className="hiw-sidebar-title">Service Controls</h3>
+          <p className="hiw-sidebar-subtitle">Toggle what needs to be done, then run the job sequence.</p>
 
-          <div className="house-wrap">
-            <div className="roof" />
-            <div className="gutter-line" />
-            <div className="house-front" />
-            <div className="house-side" />
-            <div className="grime-overlay" />
-            <div className="door" />
-            <div className="window window-left" />
-            <div className="window window-right" />
-          </div>
-
-          <div className="hedge hedge-left" />
-          <div className="hedge hedge-right" />
-          <div className="yard" />
-          <div className="weeds" />
-
-          <div className={['worker', activeTask ? `worker-${activeTask}` : 'worker-idle'].join(' ')}>
-            <span className="worker-head" />
-            <span className="worker-body" />
-            <span className="tool" />
-          </div>
-        </div>
-
-        <div className="progress-strip">
-          <div className="progress-labels">
-            <span>Progress</span>
-            <strong>{Math.round(progress)}%</strong>
-          </div>
-          <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-          <p className="status-text">
-            {done
-              ? 'All selected services complete. Your property is transformed.'
-              : activeTask
-                ? `Now working: ${TASKS.find((task) => task.id === activeTask)?.label}`
-                : 'Select services and press Start Demo to preview the process.'}
-          </p>
-        </div>
-      </section>
-
-      <section className="control-card">
-        <h3 className="control-title">Choose what your house needs</h3>
-        <p className="control-subtitle">
-          Customers can select one service or a complete package, then watch live progress before booking.
-        </p>
-
-        <div className="task-list" role="list" aria-label="Service selection">
           {TASKS.map((task) => {
-            const isSelected = selected.includes(task.id);
-            const status = taskStatuses[task.id];
-
+            const isActive = activeTasks[task.id];
             return (
               <button
                 key={task.id}
                 type="button"
-                className={[
-                  'task-row',
-                  isSelected ? 'is-selected' : '',
-                  status === 'active' ? 'is-active' : '',
-                  status === 'done' ? 'is-done' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
+                className={`hiw-toggle-btn ${isActive ? 'active' : ''}`}
+                data-service={task.id}
+                aria-pressed={isActive}
                 onClick={() => toggleTask(task.id)}
-                aria-pressed={isSelected}
-                disabled={isRunning}
               >
-                <div>
-                  <p className="task-title">{task.label}</p>
-                  <p className="task-detail">{task.detail}</p>
-                </div>
-                <span className="task-badge">
-                  {status === 'done' ? 'Done' : status === 'active' ? 'Working' : isSelected ? 'Selected' : 'Off'}
-                </span>
+                <span>{task.label}</span>
+                <small>{task.description}</small>
               </button>
             );
           })}
-        </div>
 
-        <div className="action-row">
-          <button type="button" className="btn-primary" onClick={startDemo} disabled={isRunning || selectedTasks.length === 0}>
-            {isRunning ? 'Running Demo' : done ? 'Run Again' : 'Start Demo'}
+          <button id="run-sequence-btn" type="button" className="hiw-run-sequence-btn" onClick={runSequence} disabled={isRunning}>
+            {isRunning ? 'Running Sequence...' : 'Run Sequence'}
           </button>
-          <button type="button" className="btn-secondary" onClick={resetDemo}>
-            Reset
-          </button>
-        </div>
 
-        <div className="summary-box">
-          <p>
-            Selected services: <strong>{selectedTasks.length}</strong>
-          </p>
-          <p>
-            Completed: <strong>{completedCount}</strong>
-          </p>
-          <p>
-            Estimated demo time: <strong>{Math.max(1, Math.round(totalMs / 1000))} sec</strong>
-          </p>
-        </div>
-      </section>
+          <button type="button" className="hiw-reset-btn" onClick={resetScene} disabled={isRunning}>
+            Reset Scene
+          </button>
+
+          <p className="hiw-status-text">{statusText}</p>
+
+          <div className="hiw-progress-track" aria-label="Progress track">
+            <div id="progress-bar" ref={progressRef} className="hiw-progress-bar" />
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
