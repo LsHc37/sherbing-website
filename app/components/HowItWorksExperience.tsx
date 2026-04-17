@@ -10,11 +10,57 @@ type SceneData = {
   renderer: THREE.WebGLRenderer;
   camera: THREE.PerspectiveCamera;
   scene: THREE.Scene;
-  overgrownGrass: THREE.Mesh[];
   gutterDebris: THREE.Mesh[];
-  weeds: THREE.Mesh[];
   frameId: number;
 };
+
+let overgrownGrass: THREE.Mesh[] = [];
+let weedClusters: THREE.Mesh[] = [];
+
+function spawnYardMess(scene: THREE.Scene) {
+  overgrownGrass = [];
+  weedClusters = [];
+
+  const grassGeometry = new THREE.CylinderGeometry(0.06, 0.08, 1.0, 7);
+  const grassMaterial = new THREE.MeshStandardMaterial({ color: 0x186c2a });
+
+  const weedGeometry = new THREE.SphereGeometry(0.12, 12, 12);
+  const weedMaterial = new THREE.MeshStandardMaterial({ color: 0xd8cc45 });
+
+  const isInsideHouseFootprint = (x: number, z: number) => Math.abs(x) < 2.4 && Math.abs(z) < 2.3;
+
+  const randomOpenPosition = (range: number) => {
+    let x = 0;
+    let z = 0;
+
+    do {
+      x = (Math.random() - 0.5) * range;
+      z = (Math.random() - 0.5) * range;
+    } while (isInsideHouseFootprint(x, z));
+
+    return { x, z };
+  };
+
+  for (let index = 0; index < 50; index += 1) {
+    const grass = new THREE.Mesh(grassGeometry, grassMaterial);
+    const { x, z } = randomOpenPosition(17);
+    grass.position.set(x, 0.5, z);
+    grass.castShadow = true;
+    grass.receiveShadow = true;
+    scene.add(grass);
+    overgrownGrass.push(grass);
+  }
+
+  for (let index = 0; index < 20; index += 1) {
+    const weed = new THREE.Mesh(weedGeometry, weedMaterial);
+    const { x, z } = randomOpenPosition(14);
+    weed.position.set(x, 0.12, z);
+    weed.castShadow = true;
+    weed.receiveShadow = true;
+    scene.add(weed);
+    weedClusters.push(weed);
+  }
+}
 
 const TASKS: Array<{ id: TaskId; label: string; description: string }> = [
   { id: 'lawn', label: 'Lawn Mowing', description: 'Cut long grass down to a clean finish.' },
@@ -61,10 +107,24 @@ export default function HowItWorksExperience() {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(width, height, false);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1.25);
     directionalLight.position.set(10, 16, 8);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 60;
+    directionalLight.shadow.camera.left = -16;
+    directionalLight.shadow.camera.right = 16;
+    directionalLight.shadow.camera.top = 16;
+    directionalLight.shadow.camera.bottom = -16;
     scene.add(directionalLight);
+
+    const hemisphereLight = new THREE.HemisphereLight(0xd8eeff, 0x5f8748, 0.5);
+    scene.add(hemisphereLight);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
     scene.add(ambientLight);
@@ -74,53 +134,63 @@ export default function HowItWorksExperience() {
       new THREE.MeshStandardMaterial({ color: 0x47a447 }),
     );
     lawn.position.y = -0.5;
+    lawn.castShadow = true;
+    lawn.receiveShadow = true;
     scene.add(lawn);
 
     const house = new THREE.Group();
 
+    const houseWidth = 3.8;
+    const houseHeight = 2.3;
+    const houseDepth = 3.2;
+
     const walls = new THREE.Mesh(
-      new THREE.BoxGeometry(3.2, 2.2, 3),
+      new THREE.BoxGeometry(houseWidth, houseHeight, houseDepth),
       new THREE.MeshStandardMaterial({ color: 0xffffff }),
     );
-    walls.position.y = 1.1;
+    walls.position.y = houseHeight / 2;
+    walls.castShadow = true;
+    walls.receiveShadow = true;
     house.add(walls);
 
-    const roofLeft = new THREE.Mesh(
-      new THREE.BoxGeometry(3.4, 0.2, 1.9),
+    const roofHeight = 1.4;
+    const roof = new THREE.Mesh(
+      new THREE.ConeGeometry(houseWidth * 0.9, roofHeight, 4),
       new THREE.MeshStandardMaterial({ color: 0x7a4e2c }),
     );
-    roofLeft.position.set(0, 2.4, -0.5);
-    roofLeft.rotation.x = 0.5;
-    house.add(roofLeft);
+    roof.position.y = houseHeight + roofHeight / 2;
+    roof.rotation.y = Math.PI / 4;
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    house.add(roof);
 
-    const roofRight = new THREE.Mesh(
-      new THREE.BoxGeometry(3.4, 0.2, 1.9),
-      new THREE.MeshStandardMaterial({ color: 0x7a4e2c }),
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(0.72, 1.2, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0x6b3f22 }),
     );
-    roofRight.position.set(0, 2.4, 0.5);
-    roofRight.rotation.x = -0.5;
-    house.add(roofRight);
+    door.position.set(0, 0.6, houseDepth / 2 + 0.045);
+    door.castShadow = true;
+    door.receiveShadow = true;
+    house.add(door);
+
+    const windowGeometry = new THREE.BoxGeometry(0.58, 0.58, 0.07);
+    const windowMaterial = new THREE.MeshStandardMaterial({ color: 0x9fd8ff });
+
+    const leftWindow = new THREE.Mesh(windowGeometry, windowMaterial);
+    leftWindow.position.set(-0.92, 1.24, houseDepth / 2 + 0.04);
+    leftWindow.castShadow = true;
+    leftWindow.receiveShadow = true;
+    house.add(leftWindow);
+
+    const rightWindow = new THREE.Mesh(windowGeometry, windowMaterial);
+    rightWindow.position.set(0.92, 1.24, houseDepth / 2 + 0.04);
+    rightWindow.castShadow = true;
+    rightWindow.receiveShadow = true;
+    house.add(rightWindow);
 
     scene.add(house);
 
-    const overgrownGrass: THREE.Mesh[] = [];
-    const grassGeometry = new THREE.CylinderGeometry(0.06, 0.08, 1.0, 7);
-    const grassMaterial = new THREE.MeshStandardMaterial({ color: 0x1f8f35 });
-
-    for (let index = 0; index < 50; index += 1) {
-      const grass = new THREE.Mesh(grassGeometry, grassMaterial);
-      let x = (Math.random() - 0.5) * 17;
-      let z = (Math.random() - 0.5) * 17;
-
-      if (Math.abs(x) < 2.4 && Math.abs(z) < 2.3) {
-        x += x >= 0 ? 3.1 : -3.1;
-        z += z >= 0 ? 3.1 : -3.1;
-      }
-
-      grass.position.set(x, 0.5, z);
-      scene.add(grass);
-      overgrownGrass.push(grass);
-    }
+    spawnYardMess(scene);
 
     const gutterDebris: THREE.Mesh[] = [];
     const debrisGeometry = new THREE.BoxGeometry(0.32, 0.16, 0.24);
@@ -144,25 +214,6 @@ export default function HowItWorksExperience() {
       gutterDebris.push(debris);
     });
 
-    const weeds: THREE.Mesh[] = [];
-    const weedGeometry = new THREE.SphereGeometry(0.12, 12, 12);
-    const weedMaterial = new THREE.MeshStandardMaterial({ color: 0xd8cc45 });
-
-    for (let index = 0; index < 28; index += 1) {
-      const weed = new THREE.Mesh(weedGeometry, weedMaterial);
-      let x = (Math.random() - 0.5) * 14;
-      let z = (Math.random() - 0.5) * 14;
-
-      if (Math.abs(x) < 2.2 && Math.abs(z) < 2.2) {
-        x += x >= 0 ? 2.8 : -2.8;
-        z += z >= 0 ? 2.8 : -2.8;
-      }
-
-      weed.position.set(x, 0.12, z);
-      scene.add(weed);
-      weeds.push(weed);
-    }
-
     let frameId = 0;
 
     const animate = () => {
@@ -177,9 +228,7 @@ export default function HowItWorksExperience() {
       renderer,
       camera,
       scene,
-      overgrownGrass,
       gutterDebris,
-      weeds,
       frameId: 0,
     };
     frameId = window.requestAnimationFrame(animate);
@@ -239,7 +288,7 @@ export default function HowItWorksExperience() {
 
       setStatusText('Lawn mowing in progress...');
 
-      gsap.to(sceneData.overgrownGrass.map((mesh) => mesh.scale), {
+      gsap.to(overgrownGrass.map((mesh) => mesh.scale), {
         y: 0.1,
         duration: 2,
         stagger: 0.03,
@@ -284,7 +333,7 @@ export default function HowItWorksExperience() {
 
       setStatusText('Weed removal in progress...');
 
-      gsap.to(sceneData.weeds.map((mesh) => mesh.scale), {
+      gsap.to(weedClusters.map((mesh) => mesh.scale), {
         y: 0.01,
         x: 0.01,
         z: 0.01,
@@ -301,7 +350,7 @@ export default function HowItWorksExperience() {
       return;
     }
 
-    sceneData.overgrownGrass.forEach((mesh) => {
+    overgrownGrass.forEach((mesh) => {
       mesh.visible = true;
       mesh.scale.set(1, 1, 1);
     });
@@ -311,7 +360,7 @@ export default function HowItWorksExperience() {
       mesh.scale.set(1, 1, 1);
     });
 
-    sceneData.weeds.forEach((mesh) => {
+    weedClusters.forEach((mesh) => {
       mesh.visible = true;
       mesh.scale.set(1, 1, 1);
     });

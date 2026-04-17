@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Logo from '@/app/components/Logo';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatDateTime12, formatTime12 } from '@/lib/dateTime';
 
 type User = {
   email: string;
@@ -154,7 +155,7 @@ function BookingCard({ booking, actionLoading, canManageActions, onUpdateSchedul
           </div>
 
           <p className="text-xs text-gray-500">
-            Booking ID: {booking.id} | Created: {new Date(booking.created_at).toLocaleString()}
+            Booking ID: {booking.id} | Created: {formatDateTime12(booking.created_at)}
           </p>
 
           <p className="text-gray-700">{formatAddress(booking) || 'Address unavailable'}</p>
@@ -173,7 +174,7 @@ function BookingCard({ booking, actionLoading, canManageActions, onUpdateSchedul
             <p><span className="font-medium text-gray-800">Email:</span> {booking.customer_email || 'N/A'}</p>
             <p><span className="font-medium text-gray-800">Phone:</span> {booking.customer_phone || 'N/A'}</p>
             <p><span className="font-medium text-gray-800">Scheduled Date:</span> {booking.scheduled_date || 'TBD'}</p>
-            <p><span className="font-medium text-gray-800">Scheduled Time:</span> {booking.scheduled_time || 'TBD'}</p>
+            <p><span className="font-medium text-gray-800">Scheduled Time:</span> {formatTime12(booking.scheduled_time)}</p>
             <p><span className="font-medium text-gray-800">Duration:</span> {Number(booking.scheduled_duration_minutes || 60)} minutes</p>
             <p><span className="font-medium text-gray-800">Quoted Price:</span> {formatMoney(Number(booking.customer_price || booking.estimated_price || 0))}</p>
           </div>

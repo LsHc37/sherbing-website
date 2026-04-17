@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Logo from '@/app/components/Logo';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatTime12 } from '@/lib/dateTime';
 
 type User = {
   email: string;
@@ -102,7 +103,7 @@ function normalizeTimeToMinutes(value: string): number {
 function formatMinutesToTime(totalMinutes: number): string {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  return formatTime12(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`);
 }
 
 function recurrenceLabel(entry: AvailabilityEntry): string {
@@ -743,7 +744,7 @@ export default function EmployeeCalendarPage() {
                     isOpen ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/40',
                   ].join(' ')}>
                     <div className="flex items-center justify-between gap-3">
-                      <p className="font-semibold text-gray-900">{slot.time}</p>
+                      <p className="font-semibold text-gray-900">{formatTime12(slot.time)}</p>
                       <span className={isOpen ? 'text-green-700 text-sm font-medium' : 'text-red-700 text-sm font-medium'}>
                         {isOpen ? 'Open' : 'Booked / Unavailable'}
                       </span>
@@ -783,7 +784,7 @@ export default function EmployeeCalendarPage() {
               {sortedEntries.map((entry, index) => (
                 <div key={`${entry.date}-${entry.start}-${entry.end}-${entry.type}-${index}`} className="p-4 flex items-center justify-between gap-3">
                   <div className="text-sm text-gray-700">
-                    <span className="font-medium text-gray-900">{entry.date}</span> {entry.start}-{entry.end} {' '}
+                    <span className="font-medium text-gray-900">{entry.date}</span> {formatTime12(entry.start)}-{formatTime12(entry.end)} {' '}
                     <span className={entry.type === 'blocked' ? 'text-red-700 font-medium' : 'text-green-700 font-medium'}>
                       {entry.type === 'blocked' ? 'Blocked' : 'Open'}
                     </span>

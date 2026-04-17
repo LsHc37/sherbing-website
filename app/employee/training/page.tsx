@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import Logo from '@/app/components/Logo';
+import { formatDateTime12 } from '@/lib/dateTime';
 
 type SessionUser = {
   email: string;
@@ -28,9 +29,7 @@ type OnboardingState = {
 
 function formatDate(value?: string) {
   if (!value) return 'Not completed';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
+  return formatDateTime12(value);
 }
 
 export default function EmployeeTrainingPage() {

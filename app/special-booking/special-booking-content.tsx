@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ThankYouOverlay from '@/app/components/ThankYouOverlay';
 import { getServices, validateBookingForm } from '@/lib/services/pricingService';
+import { formatTime12 } from '@/lib/dateTime';
 
 type AvailabilitySlot = { time: string; status: 'open' | 'booked' };
 type DayOpenSlots = { date: string; openTimes: string[] };
@@ -386,7 +387,7 @@ export default function SpecialBookingContent() {
                 <option value="180">3 hours</option>
               </select>
               <div className="px-4 py-3 border border-slate-200 rounded-lg bg-slate-50 text-sm text-slate-600 flex items-center">
-                {formData.scheduled_time ? `Selected time: ${formData.scheduled_time}` : 'Select a date to view open times'}
+                {formData.scheduled_time ? `Selected time: ${formatTime12(formData.scheduled_time)}` : 'Select a date to view open times'}
               </div>
             </div>
 
@@ -420,7 +421,7 @@ export default function SpecialBookingContent() {
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {openSlots.map((slot) => (
                           <button key={slot.time} type="button" onClick={() => setFormData((prev) => ({ ...prev, scheduled_time: slot.time }))} className={`px-3 py-2 rounded text-sm border bg-white text-slate-800 border-emerald-300 hover:border-emerald-500 ${formData.scheduled_time === slot.time ? 'ring-2 ring-emerald-500 border-emerald-500 bg-emerald-100/70' : ''}`}>
-                            {slot.time}
+                            {formatTime12(slot.time)}
                           </button>
                         ))}
                       </div>

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { formatTime12 } from '@/lib/dateTime';
 
 type Booking = {
   id: string;
@@ -343,7 +344,7 @@ export default function AdminRoutesPage() {
                   </td>
                   <td className="px-4 py-3 text-sm align-top">
                     <p>{booking.scheduled_date || 'Unscheduled'}</p>
-                    <p className="text-gray-600">{booking.scheduled_time || 'TBD'} ({Number(booking.scheduled_duration_minutes || 60)} min)</p>
+                    <p className="text-gray-600">{formatTime12(booking.scheduled_time)} ({Number(booking.scheduled_duration_minutes || 60)} min)</p>
                   </td>
                 </tr>
               ))}
@@ -394,7 +395,7 @@ export default function AdminRoutesPage() {
                         <p className="font-medium">{stop.booking_id}</p>
                         <p className="text-gray-600">{stop.address}, {stop.city}, {stop.state} {stop.zip_code}</p>
                       </td>
-                      <td className="px-3 py-2 text-sm">{stop.scheduled_time}</td>
+                      <td className="px-3 py-2 text-sm">{formatTime12(stop.scheduled_time)}</td>
                       <td className="px-3 py-2 text-sm">{stop.estimated_travel_minutes} min</td>
                       <td className="px-3 py-2 text-sm">{stop.estimated_service_minutes} min</td>
                       <td className="px-3 py-2 text-sm">${stop.estimated_price.toFixed(2)}</td>

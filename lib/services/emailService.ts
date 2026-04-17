@@ -1,6 +1,7 @@
 ﻿'use server';
 
 import nodemailer from 'nodemailer';
+import { formatTime12 } from '@/lib/dateTime';
 
 let emailTransporter: nodemailer.Transporter | null = null;
 
@@ -92,7 +93,7 @@ export async function sendBookingConfirmation(
   scheduledDate?: string,
   scheduledTime?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const scheduledInfo = scheduledDate ? `<p><strong>Scheduled Date:</strong> ${new Date(scheduledDate).toLocaleDateString()} ${scheduledTime || 'TBD'}</p>` : '';
+  const scheduledInfo = scheduledDate ? `<p><strong>Scheduled Date:</strong> ${new Date(scheduledDate).toLocaleDateString()} ${formatTime12(scheduledTime)}</p>` : '';
 
   return sendMail({
     to: email,

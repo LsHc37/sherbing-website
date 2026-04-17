@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import Logo from '@/app/components/Logo';
+import { formatDateTime12 } from '@/lib/dateTime';
 
 type User = {
   email: string;
@@ -54,9 +55,7 @@ const MAIN_ADMIN_EMAIL = 'lucas.mellen1@gmail.com';
 
 function formatDateTime(value: string) {
   if (!value) return 'Not provided';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return formatDateTime12(value);
 }
 
 function statusStyles(status: JobApplication['status']) {

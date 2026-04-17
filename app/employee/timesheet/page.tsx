@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { formatDateTime12 } from '@/lib/dateTime';
 
 type TimesheetEntry = {
   entry_id: string;
@@ -69,8 +70,7 @@ function formatMinutes(minutes: number) {
 }
 
 function formatDateTime(value: string) {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+  return formatDateTime12(value);
 }
 
 export default function EmployeeTimesheetPage() {

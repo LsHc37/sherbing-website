@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ThankYouOverlay from '@/app/components/ThankYouOverlay';
+import { formatTime12 } from '@/lib/dateTime';
 import {
   getServices,
   validateBookingForm,
@@ -707,7 +708,7 @@ export default function BookingContent() {
                 <option value="180">3 hours</option>
               </select>
               <div className="px-4 py-3 border border-slate-200 rounded-lg bg-slate-50 text-sm text-slate-600 flex items-center">
-                {formData.scheduled_time ? `Selected time: ${formData.scheduled_time}` : 'Select a date to view open times'}
+                {formData.scheduled_time ? `Selected time: ${formatTime12(formData.scheduled_time)}` : 'Select a date to view open times'}
               </div>
             </div>
 
@@ -770,7 +771,7 @@ export default function BookingContent() {
                                   isSelected ? 'ring-2 ring-emerald-500 border-emerald-500 bg-emerald-100/70' : '',
                                 ].join(' ')}
                               >
-                                {slot.time}
+                                {formatTime12(slot.time)}
                               </button>
                             );
                           })}

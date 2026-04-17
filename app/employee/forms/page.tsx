@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import Logo from '@/app/components/Logo';
+import { formatDateTime12 } from '@/lib/dateTime';
 
 type SessionUser = {
   email: string;
@@ -137,9 +138,7 @@ const signedAtFieldMap: Record<FormKey, keyof Pick<OnboardingState, 'forms_terms
 
 function formatDate(value?: string) {
   if (!value) return 'Not signed';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
+  return formatDateTime12(value);
 }
 
 export default function EmployeeFormsPage() {

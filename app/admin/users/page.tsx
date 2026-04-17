@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { formatDateTime12 } from '@/lib/dateTime';
 
 type User = {
   created_at: string;
@@ -81,9 +82,7 @@ export default function AdminUsersPage() {
 
   const formatDate = (value?: string) => {
     if (!value) return 'Pending';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleString();
+    return formatDateTime12(value);
   };
 
   const formatHours = (minutes?: string) => {
