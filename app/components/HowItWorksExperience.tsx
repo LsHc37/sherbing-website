@@ -210,6 +210,7 @@ export default function HowItWorksExperience() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneDataRef = useRef<SceneData | null>(null);
   const progressRef = useRef<HTMLDivElement | null>(null);
+  const runButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const [activeTasks, setActiveTasks] = useState<Record<TaskId, boolean>>({
     lawn: true,
@@ -220,6 +221,7 @@ export default function HowItWorksExperience() {
   const [isRunning, setIsRunning] = useState(false);
   const [statusText, setStatusText] = useState('Select services, then click Run Sequence.');
   const [progressStageLabel, setProgressStageLabel] = useState('Progress');
+  const [isReadyToBook, setIsReadyToBook] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -705,20 +707,30 @@ export default function HowItWorksExperience() {
       const wallMaterial = sceneData.houseWalls.material as THREE.MeshStandardMaterial;
       wallMaterial.color.set(0x666666);
 
+      let cleanedUp = false;
+      const cleanupSpray = () => {
+        if (cleanedUp) {
+          return;
+        }
+
+        cleanedUp = true;
+        sceneData.scene.remove(sprayGroup);
+        particleGeometry.dispose();
+        particleMaterial.dispose();
+        setActiveTasks((current) => ({ ...current, wash: false }));
+        resolve();
+      };
+
       gsap.to(wallMaterial.color, {
         r: 1,
         g: 1,
         b: 1,
         duration: 3,
         ease: 'power1.inOut',
-        onComplete: () => {
-          sceneData.scene.remove(sprayGroup);
-          particleGeometry.dispose();
-          particleMaterial.dispose();
-          setActiveTasks((current) => ({ ...current, wash: false }));
-          resolve();
-        },
       });
+
+      // Longest spray animation is slightly above 3.3s (scale tween), then clean up GPU resources.
+      gsap.delayedCall(3.4, cleanupSpray);
     });
   };
 
@@ -784,6 +796,11 @@ export default function HowItWorksExperience() {
     setActiveTasks({ lawn: true, gutters: true, wash: true, weeds: true });
     setProgressStageLabel('Progress');
     setStatusText('Scene reset. Select services, then click Run Sequence.');
+    setIsReadyToBook(false);
+
+    if (runButtonRef.current) {
+      gsap.set(runButtonRef.current, { scale: 1 });
+    }
   };
 
   const runSequence = async () => {
@@ -806,6 +823,7 @@ export default function HowItWorksExperience() {
     }
 
     setIsRunning(true);
+    setIsReadyToBook(false);
     setStatusText('Starting service sequence...');
     setProgressStageLabel('Starting...');
 
@@ -826,6 +844,17 @@ export default function HowItWorksExperience() {
 
       setStatusText('Sequence complete. Your property looks clean.');
       setProgressStageLabel('Job Complete! Ready for Booking.');
+      setIsReadyToBook(true);
+
+      if (runButtonRef.current) {
+        gsap.to(runButtonRef.current, {
+          scale: 1.06,
+          duration: 0.58,
+          repeat: 5,
+          yoyo: true,
+          ease: 'sine.inOut',
+        });
+      }
     } finally {
       setIsRunning(false);
     }
@@ -870,8 +899,15 @@ export default function HowItWorksExperience() {
             );
           })}
 
-          <button id="run-sequence-btn" type="button" className="hiw-run-sequence-btn" onClick={runSequence} disabled={isRunning}>
-            {isRunning ? 'Running Sequence...' : 'Run Sequence'}
+          <button
+            id="run-sequence-btn"
+            ref={runButtonRef}
+            type="button"
+            className="hiw-run-sequence-btn"
+            onClick={runSequence}
+            disabled={isRunning}
+          >
+            {isRunning ? 'Running Sequence...' : isReadyToBook ? 'Book These Services' : 'Run Sequence'}
           </button>
 
           <button type="button" className="hiw-reset-btn" onClick={resetScene} disabled={isRunning}>
