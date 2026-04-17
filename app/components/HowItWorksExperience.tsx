@@ -115,37 +115,28 @@ function createSimpleMower() {
   const mower = new THREE.Group();
 
   const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.86, 0.28, 0.58),
-    new THREE.MeshStandardMaterial({ color: 0xe44a4a }),
+    new THREE.BoxGeometry(0.8, 0.24, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x2f9e44 }),
   );
-  body.position.y = 0.23;
+  body.position.y = 0.2;
   body.castShadow = true;
   body.receiveShadow = true;
   mower.add(body);
 
-  const wheelGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 14);
-  const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x9fd8ff });
+  const wheelGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.08, 14);
+  const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x111111 });
 
-  const frontWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-  frontWheel.rotation.z = Math.PI / 2;
-  frontWheel.position.set(-0.26, 0.08, 0.22);
-  frontWheel.castShadow = true;
-  mower.add(frontWheel);
+  const leftWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+  leftWheel.rotation.z = Math.PI / 2;
+  leftWheel.position.set(0, 0.08, 0.23);
+  leftWheel.castShadow = true;
+  mower.add(leftWheel);
 
-  const backWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-  backWheel.rotation.z = Math.PI / 2;
-  backWheel.position.set(-0.26, 0.08, -0.22);
-  backWheel.castShadow = true;
-  mower.add(backWheel);
-
-  const handle = new THREE.Mesh(
-    new THREE.BoxGeometry(0.06, 0.64, 0.06),
-    new THREE.MeshStandardMaterial({ color: 0x4b5a6b }),
-  );
-  handle.position.set(0.38, 0.5, 0);
-  handle.rotation.z = -0.35;
-  handle.castShadow = true;
-  mower.add(handle);
+  const rightWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+  rightWheel.rotation.z = Math.PI / 2;
+  rightWheel.position.set(0, 0.08, -0.23);
+  rightWheel.castShadow = true;
+  mower.add(rightWheel);
 
   return mower;
 }
@@ -237,7 +228,7 @@ export default function HowItWorksExperience() {
     }
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x8ec7ff);
+    scene.background = new THREE.Color(0x87ceeb);
 
     const parent = canvas.parentElement;
     const width = Math.max(parent?.clientWidth ?? 0, 100);
@@ -252,26 +243,6 @@ export default function HowItWorksExperience() {
     renderer.setSize(width, height, false);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-    const skyboxLoader = new THREE.CubeTextureLoader();
-    skyboxLoader.load(
-      [
-        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/posx.jpg',
-        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/negx.jpg',
-        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/posy.jpg',
-        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/negy.jpg',
-        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/posz.jpg',
-        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r161/examples/textures/cube/Bridge2/negz.jpg',
-      ],
-      (cubeTexture) => {
-        scene.background = cubeTexture;
-        scene.environment = cubeTexture;
-      },
-      undefined,
-      () => {
-        scene.background = new THREE.Color(0x8ec7ff);
-      },
-    );
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1.25);
     directionalLight.position.set(10, 16, 8);
@@ -306,6 +277,15 @@ export default function HowItWorksExperience() {
     const houseWidth = 3.8;
     const houseHeight = 2.3;
     const houseDepth = 3.2;
+
+    const driveway = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 8.4),
+      new THREE.MeshStandardMaterial({ color: 0x808080, side: THREE.DoubleSide }),
+    );
+    driveway.rotation.x = -Math.PI / 2;
+    driveway.position.set(0, 0.02, 5.8);
+    driveway.receiveShadow = true;
+    scene.add(driveway);
 
     const walls = new THREE.Mesh(
       new THREE.BoxGeometry(houseWidth, houseHeight, houseDepth),
@@ -485,6 +465,86 @@ export default function HowItWorksExperience() {
     });
   };
 
+  const runDroneScan = async () => {
+    const sceneData = sceneDataRef.current;
+    if (!sceneData) {
+      return;
+    }
+
+    setStatusText('Drone scan in progress...');
+    setProgressStageLabel('Scanning Property...');
+
+    const drone = new THREE.Group();
+
+    const droneBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.52, 0.16, 0.52),
+      new THREE.MeshStandardMaterial({ color: 0x2f2f35 }),
+    );
+    droneBody.castShadow = true;
+    droneBody.receiveShadow = true;
+    drone.add(droneBody);
+
+    const rotorGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.03, 14);
+    const rotorMaterial = new THREE.MeshStandardMaterial({ color: 0x575d66 });
+    const rotorOffsets: Array<[number, number]> = [
+      [-0.28, -0.28],
+      [0.28, -0.28],
+      [-0.28, 0.28],
+      [0.28, 0.28],
+    ];
+
+    const rotors = rotorOffsets.map(([x, z]) => {
+      const rotor = new THREE.Mesh(rotorGeometry, rotorMaterial);
+      rotor.position.set(x, 0.08, z);
+      rotor.castShadow = true;
+      drone.add(rotor);
+      return rotor;
+    });
+
+    drone.position.set(-10, 8, -8);
+    sceneData.scene.add(drone);
+
+    const rotorSpinTweens = rotors.map((rotor) =>
+      gsap.to(rotor.rotation, {
+        y: Math.PI * 2,
+        duration: 0.14,
+        ease: 'none',
+        repeat: -1,
+      }),
+    );
+
+    await new Promise<void>((resolve) => {
+      gsap
+        .timeline({
+          onComplete: resolve,
+        })
+        .to(drone.position, {
+          x: -1,
+          y: 4.8,
+          z: -1,
+          duration: 1.25,
+          ease: 'power2.out',
+        })
+        .to(drone.position, {
+          y: 5.1,
+          duration: 0.5,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: 1,
+        })
+        .to(drone.position, {
+          x: 12,
+          y: 6.9,
+          z: 3,
+          duration: 1,
+          ease: 'power2.in',
+        });
+    });
+
+    rotorSpinTweens.forEach((tween) => tween.kill());
+    sceneData.scene.remove(drone);
+  };
+
   const runGutterTask = () => {
     return new Promise<void>((resolve) => {
       const sceneData = sceneDataRef.current;
@@ -599,7 +659,7 @@ export default function HowItWorksExperience() {
     });
   };
 
-  const runWeedTask = () => {
+  const runWeedRemovalTask = () => {
     return new Promise<void>((resolve) => {
       const sceneData = sceneDataRef.current;
       if (!sceneData || !activeTasks.weeds) {
@@ -610,11 +670,12 @@ export default function HowItWorksExperience() {
       setStatusText('Weed removal in progress...');
       setProgressStageLabel('Removing Weeds...');
 
-      gsap.to([...weedClusters, ...yardMess].map((mesh) => mesh.scale), {
-        y: 0.01,
-        x: 0.01,
-        z: 0.01,
-        duration: 1.6,
+      gsap.to(weedClusters.map((mesh) => mesh.scale), {
+        y: 0,
+        x: 0,
+        z: 0,
+        duration: 1.5,
+        ease: 'back.in(1.7)',
         stagger: 0.03,
         onComplete: () => {
           setActiveTasks((current) => ({ ...current, weeds: false }));
@@ -671,7 +732,7 @@ export default function HowItWorksExperience() {
       { id: 'lawn', run: runLawnMowingTask },
       { id: 'gutters', run: runGutterTask },
       { id: 'wash', run: runExteriorWashTask },
-      { id: 'weeds', run: runWeedTask },
+      { id: 'weeds', run: runWeedRemovalTask },
     ];
 
     const enabledTasks = sequenceOrder.filter((entry) => activeTasks[entry.id]);
@@ -690,6 +751,8 @@ export default function HowItWorksExperience() {
     }
 
     try {
+      await runDroneScan();
+
       let completeCount = 0;
       for (const task of enabledTasks) {
         await task.run();
