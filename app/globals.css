@@ -734,6 +734,26 @@ textarea {
   overflow: hidden;
 }
 
+.hiw-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 0.55rem;
+  background: linear-gradient(180deg, rgba(6, 18, 11, 0.24), rgba(12, 34, 21, 0.38));
+  color: #eefaf2;
+  font-weight: 700;
+}
+
+.hiw-loading-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  margin-inline: auto;
+  background: #8df1ae;
+  animation: hiw-pulse 820ms ease-in-out infinite;
+}
+
 #webgl-canvas {
   width: 100%;
   height: 100%;
@@ -829,6 +849,44 @@ textarea {
   margin-top: 0.25rem;
 }
 
+.hiw-timeline {
+  margin-top: 0.25rem;
+  display: grid;
+  gap: 0.32rem;
+}
+
+.hiw-timeline-row {
+  border: 1px solid rgba(136, 194, 158, 0.38);
+  border-radius: 0.56rem;
+  padding: 0.42rem 0.5rem;
+  font-size: 0.76rem;
+  text-transform: capitalize;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.hiw-timeline-row strong {
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.hiw-timeline-row.state-running {
+  border-color: #f2da77;
+  background: rgba(228, 189, 63, 0.14);
+}
+
+.hiw-timeline-row.state-done {
+  border-color: #8de2ae;
+  background: rgba(90, 180, 125, 0.2);
+}
+
+.hiw-timeline-row.state-skipped {
+  border-color: rgba(170, 182, 173, 0.4);
+  color: #aac8b5;
+}
+
 .hiw-progress-track {
   margin-top: auto;
   width: 100%;
@@ -843,6 +901,19 @@ textarea {
   width: 0%;
   height: 100%;
   background: linear-gradient(90deg, #22c55e, #9be163);
+}
+
+@keyframes hiw-pulse {
+  0%,
+  100% {
+    transform: scale(0.86);
+    opacity: 0.85;
+  }
+
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
 }
 
 @media (max-width: 1024px) {

@@ -680,4 +680,58 @@ Proper pool maintenance prevents algae, maintains water chemistry, and extends e
       },
     ],
   },
+  pressure_washing: {
+    fullDescription: `Professional pressure washing transforms your home exterior from dirty to brilliant. We offer three service tiers to match your needs and budget: Basic Wash, Standard Wash (our industry standard), and Premium Soft Wash for delicate surfaces.
+
+Our pricing is based on your home size, from $0.15 per sq ft (Basic) to $0.50 per sq ft (Premium Soft Wash). We use your water supply, so you only pay for our service and expertise. From small 1,000 sq ft homes to large estates, we have a tier that works for you.`,
+    benefits: [
+      'Three service tiers for every budget and surface type',
+      'Removes dirt, algae, mildew, and organic growth',
+      'Protects delicate surfaces with Soft Wash option',
+      'Increases curb appeal dramatically',
+      'Prevents costly damage from buildup',
+      'Safe for vinyl, brick, wood, and stucco siding',
+      'Fast turnaround—most homes completed in 1-6 hours',
+      'Uses your water supply (we don\'t bring equipment)',
+    ],
+    process: [
+      'Choose your service tier: Basic, Standard, or Premium Soft Wash',
+      'We assess your home exterior and identify problem areas',
+      'Apply appropriate pre-treatment if needed',
+      'Clean using the proper pressure level for your surfaces',
+      'Rinse thoroughly for a spotless finish',
+      'Your home exterior looks brand new',
+    ],
+    faqs: [
+      {
+        question: 'What\'s the difference between the three tiers?',
+        answer: 'Basic Wash ($0.15/sq ft) uses high-pressure water for durable surfaces like brick and standard vinyl. Standard Wash ($0.30/sq ft, our most popular) pre-treats with mild detergent for stubborn grime. Premium Soft Wash ($0.50/sq ft) uses low-pressure specialized chemicals for delicate surfaces like stucco, aged wood, and painted exteriors.',
+      },
+      {
+        question: 'Do you bring your own water?',
+        answer: 'No. We use your home\'s water supply, so you don\'t pay for water delivery or equipment setup. This keeps costs lower for you.',
+      },
+      {
+        question: 'Is pressure washing safe for my siding?',
+        answer: 'Yes, as long as the right tier is selected. Our team assesses your surfaces first—Basic for durable materials, Standard for typical homes, Premium Soft Wash for delicate surfaces.',
+      },
+      {
+        question: 'How long does pressure washing take?',
+        answer: 'Most homes take 1-6 hours depending on size and tier selected. Check our estimated times based on square footage in the pricing table.',
+      },
+      {
+        question: 'Will pressure washing damage my plants or landscaping?',
+        answer: 'We protect your landscaping and can rinse plants as needed. Let us know about any sensitive areas beforehand.',
+      },
+      {
+        question: 'Can you pressure wash driveways too?',
+        answer: 'Yes! Driveways are included in our quoted price. We can also offer driveway add-on estimates ($75-$300 depending on size).',
+      },
+      {
+        question: 'What if my house is over 4,000 sq ft?',
+        answer: 'For larger homes and estates, we provide custom quotes. Contact us with your property details for an accurate estimate.',
+      },
+    ],
+  },
 };
+

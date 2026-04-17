@@ -87,7 +87,24 @@ export default function BookingContent() {
 
   useEffect(() => {
     const queryServiceId = searchParams.get('service');
+    const queryServiceList = searchParams.get('services');
     const referralCode = searchParams.get('ref') || searchParams.get('referral') || searchParams.get('sales_referral_code');
+
+    if (queryServiceList) {
+      const requestedIds = queryServiceList
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+
+      const validIds = requestedIds.filter((id) => services.some((service) => service.id === id));
+
+      if (validIds.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          service_ids: Array.from(new Set(validIds)),
+        }));
+      }
+    }
 
     if (queryServiceId) {
       if (!services.some((service) => service.id === queryServiceId)) {

@@ -11,6 +11,7 @@ const serviceIcons: Record<string, string> = {
   hedge_trimming: '✂️',
   window_cleaning: '🪟',
   dog_waste_removal: '🐕',
+  pressure_washing: '💨',
 };
 
 export function generateStaticParams() {

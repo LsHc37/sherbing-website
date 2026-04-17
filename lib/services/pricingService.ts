@@ -112,6 +112,14 @@ export const SERVICE_PRICING: Record<string, PricingRule> = {
     description: 'Flat-rate dog waste pickup service to keep your yard clean and healthy.',
     images: ['/services/dog-waste-1.jpg']
   },
+  pressure_washing: { 
+    name: 'Pressure Washing', 
+    pricePerSqft: 0.30, 
+    minimumPrice: 150,
+    areaBasis: 'property',
+    description: 'Professional pressure washing for home exteriors with three service tiers—Basic, Standard, and Premium Soft Wash. We use your water.',
+    images: ['/services/pressure-washing-1.jpg']
+  },
 };
 
 export const SERVICE_PACKAGES: PackageRule[] = [

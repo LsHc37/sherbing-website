@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 
 type TaskId = 'lawn' | 'gutters' | 'wash' | 'weeds';
+type TaskTimelineStatus = 'pending' | 'running' | 'done' | 'skipped';
 
 type SceneData = {
   renderer: THREE.WebGLRenderer;
@@ -206,7 +208,22 @@ const TASKS: Array<{ id: TaskId; label: string; description: string }> = [
   { id: 'weeds', label: 'Weed Removal', description: 'Clear visible weed clusters around the lawn.' },
 ];
 
+const TASK_TO_BOOKING_SERVICE: Record<TaskId, string> = {
+  lawn: 'lawn_mowing',
+  gutters: 'gutter_cleaning',
+  wash: 'window_cleaning',
+  weeds: 'lawn_treatment',
+};
+
+const DEFAULT_TIMELINE: Record<TaskId, TaskTimelineStatus> = {
+  lawn: 'pending',
+  gutters: 'pending',
+  wash: 'pending',
+  weeds: 'pending',
+};
+
 export default function HowItWorksExperience() {
+  const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneDataRef = useRef<SceneData | null>(null);
   const progressRef = useRef<HTMLDivElement | null>(null);
@@ -222,6 +239,9 @@ export default function HowItWorksExperience() {
   const [statusText, setStatusText] = useState('Select services, then click Run Sequence.');
   const [progressStageLabel, setProgressStageLabel] = useState('Progress');
   const [isReadyToBook, setIsReadyToBook] = useState(false);
+  const [isSceneReady, setIsSceneReady] = useState(false);
+  const [taskTimeline, setTaskTimeline] = useState<Record<TaskId, TaskTimelineStatus>>(DEFAULT_TIMELINE);
+  const [bookServiceIds, setBookServiceIds] = useState<string[]>([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -402,6 +422,7 @@ export default function HowItWorksExperience() {
       wallStartColor: walls.material.color.clone(),
       frameId: 0,
     };
+    setIsSceneReady(true);
     frameId = window.requestAnimationFrame(animate);
 
     const onResize = () => {
@@ -419,6 +440,7 @@ export default function HowItWorksExperience() {
       window.cancelAnimationFrame(frameId);
       renderer.dispose();
       sceneDataRef.current = null;
+      setIsSceneReady(false);
       overgrownGrass = [];
       weedClusters = [];
       yardMess = [];
@@ -794,6 +816,8 @@ export default function HowItWorksExperience() {
     }
 
     setActiveTasks({ lawn: true, gutters: true, wash: true, weeds: true });
+    setTaskTimeline(DEFAULT_TIMELINE);
+    setBookServiceIds([]);
     setProgressStageLabel('Progress');
     setStatusText('Scene reset. Select services, then click Run Sequence.');
     setIsReadyToBook(false);
@@ -804,6 +828,12 @@ export default function HowItWorksExperience() {
   };
 
   const runSequence = async () => {
+    if (isReadyToBook && !isRunning) {
+      const query = bookServiceIds.length > 0 ? `?services=${encodeURIComponent(bookServiceIds.join(','))}` : '';
+      router.push(`/booking${query}`);
+      return;
+    }
+
     if (isRunning) {
       return;
     }
@@ -816,11 +846,19 @@ export default function HowItWorksExperience() {
     ];
 
     const enabledTasks = sequenceOrder.filter((entry) => activeTasks[entry.id]);
+    const enabledIds = enabledTasks.map((entry) => entry.id);
 
     if (enabledTasks.length === 0) {
       setStatusText('Select at least one service to run.');
       return;
     }
+
+    setTaskTimeline({
+      lawn: enabledIds.includes('lawn') ? 'pending' : 'skipped',
+      gutters: enabledIds.includes('gutters') ? 'pending' : 'skipped',
+      wash: enabledIds.includes('wash') ? 'pending' : 'skipped',
+      weeds: enabledIds.includes('weeds') ? 'pending' : 'skipped',
+    });
 
     setIsRunning(true);
     setIsReadyToBook(false);
@@ -836,7 +874,9 @@ export default function HowItWorksExperience() {
 
       let completeCount = 0;
       for (const task of enabledTasks) {
+        setTaskTimeline((current) => ({ ...current, [task.id]: 'running' }));
         await task.run();
+        setTaskTimeline((current) => ({ ...current, [task.id]: 'done' }));
         completeCount += 1;
         const target = Math.round((completeCount / enabledTasks.length) * 100);
         await updateProgress(target);
@@ -844,6 +884,7 @@ export default function HowItWorksExperience() {
 
       setStatusText('Sequence complete. Your property looks clean.');
       setProgressStageLabel('Job Complete! Ready for Booking.');
+      setBookServiceIds(enabledIds.map((id) => TASK_TO_BOOKING_SERVICE[id]));
       setIsReadyToBook(true);
 
       if (runButtonRef.current) {
@@ -876,6 +917,12 @@ export default function HowItWorksExperience() {
       <div className="hiw-main-container">
         <div className="hiw-canvas-shell">
           <canvas id="webgl-canvas" ref={canvasRef} />
+          {!isSceneReady && (
+            <div className="hiw-loading-overlay">
+              <span className="hiw-loading-dot" />
+              <p>Loading 3D scene...</p>
+            </div>
+          )}
         </div>
 
         <aside className="hiw-sidebar">
@@ -916,6 +963,15 @@ export default function HowItWorksExperience() {
 
           <p className="hiw-status-text">{statusText}</p>
           <p className="hiw-status-text">{progressStageLabel}</p>
+
+          <div className="hiw-timeline" aria-label="Task timeline">
+            {TASKS.map((task) => (
+              <div key={task.id} className={`hiw-timeline-row state-${taskTimeline[task.id]}`}>
+                <span>{task.label}</span>
+                <strong>{taskTimeline[task.id]}</strong>
+              </div>
+            ))}
+          </div>
 
           <div className="hiw-progress-track" aria-label="Progress track">
             <div id="progress-bar" ref={progressRef} className="hiw-progress-bar" />
