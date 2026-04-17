@@ -9,9 +9,42 @@ import { formatTime12 } from '@/lib/dateTime';
 type AvailabilitySlot = { time: string; status: 'open' | 'booked' };
 type DayOpenSlots = { date: string; openTimes: string[] };
 
-const SPECIAL_BASE_PRICE = 200;
-const INCLUDED_SERVICE_IDS = ['dog_waste_removal', 'lawn_mowing', 'hedge_trimming', 'gutter_cleaning'];
 const QUARTER_ACRE_SQFT = 10890;
+
+const SPECIAL_OFFERS = {
+  summer_cleanup: {
+    queryValue: 'summer-cleanup',
+    title: 'Premium Summer Cleanup',
+    badgeLabel: 'Summer Special Booking',
+    price: 200,
+    packageId: 'premium_summer_cleanup',
+    includedServiceIds: ['dog_waste_removal', 'lawn_mowing', 'hedge_trimming', 'gutter_cleaning'],
+    includedLabels: ['Dog poop pickup', 'Lawn mowing', 'Weed whacking', 'Hedge trimming', 'Gutter cleaning'],
+    intro: '$200 flat for standard residential lots up to 1/4 acre. Add extra services below at normal prices.',
+    includesHeader: 'Included in the flat $200 price:',
+    eligibilityCheckingText: 'Checking the address for the summer special...',
+    eligibilitySuccessText: 'Eligible for the $200 summer special.',
+    eligibilityFailText: 'instead of the flat $200 special.',
+    note: 'Severely overgrown hedges or larger properties may require a custom quote upon arrival.',
+  },
+  pressure_washing: {
+    queryValue: 'pressure-washing',
+    title: 'Pressure Washing Special',
+    badgeLabel: 'Pressure Washing Special Booking',
+    price: 150,
+    packageId: 'pressure_washing_special',
+    includedServiceIds: ['pressure_washing'],
+    includedLabels: ['Driveway pressure washing', 'Sidewalk pressure washing'],
+    intro: '$150 flat for properties up to 1/4 acre. Driveway and sidewalk pressure washing are included.',
+    includesHeader: 'Included in the flat $150 price:',
+    eligibilityCheckingText: 'Checking the address for the pressure washing special...',
+    eligibilitySuccessText: 'Eligible for the $150 pressure washing special.',
+    eligibilityFailText: 'instead of the flat $150 special.',
+    note: 'This special uses the same eligibility rules: property must be at or under 1/4 acre. We use the customer\'s water supply.',
+  },
+} as const;
+
+type SpecialOfferKey = keyof typeof SPECIAL_OFFERS;
 
 function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -30,8 +63,20 @@ function formatQuickDateLabel(isoDate: string): string {
 
 export default function SpecialBookingContent() {
   const searchParams = useSearchParams();
+  const requestedOffer = searchParams.get('offer');
+  const specialOfferKey: SpecialOfferKey = requestedOffer === SPECIAL_OFFERS.pressure_washing.queryValue
+    ? 'pressure_washing'
+    : 'summer_cleanup';
+  const specialOffer = SPECIAL_OFFERS[specialOfferKey];
   const services = useMemo(() => getServices(), []);
-  const addOnServices = useMemo(() => services.filter((service) => !INCLUDED_SERVICE_IDS.includes(service.id)), [services]);
+  const includedServiceIdSet = useMemo(
+    () => new Set<string>(specialOffer.includedServiceIds as readonly string[]),
+    [specialOffer]
+  );
+  const addOnServices = useMemo(
+    () => services.filter((service) => !includedServiceIdSet.has(service.id)),
+    [services, includedServiceIdSet]
+  );
   const minimumScheduleDate = useMemo(() => {
     const date = new Date();
     date.setDate(date.getDate() + 1);
@@ -39,7 +84,7 @@ export default function SpecialBookingContent() {
   }, []);
 
   const [formData, setFormData] = useState({
-    service_ids: [...INCLUDED_SERVICE_IDS],
+    service_ids: [...specialOffer.includedServiceIds],
     address: '',
     city: '',
     state: 'ID',
@@ -72,6 +117,11 @@ export default function SpecialBookingContent() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, service_ids: [...specialOffer.includedServiceIds] }));
+    setSelectedAddOns([]);
+  }, [specialOffer]);
+
   const checkEligibility = async () => {
     if (!formData.address.trim() || !formData.city.trim() || !formData.state.trim() || !formData.zip_code.trim()) {
       setEligibilityStatus('error');
@@ -80,7 +130,7 @@ export default function SpecialBookingContent() {
     }
 
     setEligibilityStatus('checking');
-    setEligibilityMessage('Checking the address for the summer special...');
+    setEligibilityMessage(specialOffer.eligibilityCheckingText);
 
     try {
       const response = await fetch('/api/estimate', {
@@ -110,8 +160,8 @@ export default function SpecialBookingContent() {
       setEstimatedLotSqft(lotSqft);
       setEligibilityStatus(eligible ? 'eligible' : 'custom_quote');
       setEligibilityMessage(eligible
-        ? `Eligible for the $200 summer special. Estimated lot size is about ${Math.round(lotSqft).toLocaleString()} sqft, which is at or under 1/4 acre.`
-        : `This property is estimated at about ${Math.round(lotSqft).toLocaleString()} sqft, so a custom quote will be needed instead of the flat $200 special.`);
+        ? `${specialOffer.eligibilitySuccessText} Estimated lot size is about ${Math.round(lotSqft).toLocaleString()} sqft, which is at or under 1/4 acre.`
+        : `This property is estimated at about ${Math.round(lotSqft).toLocaleString()} sqft, so a custom quote will be needed ${specialOffer.eligibilityFailText}`);
     } catch {
       setEligibilityStatus('error');
       setEligibilityMessage('Could not check eligibility right now. Please try again in a moment.');
@@ -128,7 +178,7 @@ export default function SpecialBookingContent() {
     [selectedAddOnServices]
   );
 
-  const totalPrice = SPECIAL_BASE_PRICE + addOnTotal;
+  const totalPrice = specialOffer.price + addOnTotal;
 
   const openSlots = useMemo(() => availabilitySlots.filter((slot) => slot.status === 'open'), [availabilitySlots]);
 
@@ -233,10 +283,10 @@ export default function SpecialBookingContent() {
         body: JSON.stringify({
           ...formData,
           service_ids: [...formData.service_ids, ...selectedAddOnServices.map((service) => service.id)],
-          package_id: 'premium_summer_cleanup',
+          package_id: specialOffer.packageId,
           estimated_price: totalPrice,
           referral_code: formData.sales_referral_code,
-          notes: `${formData.notes ? `${formData.notes} | ` : ''}Summer special booking with add-ons: ${selectedAddOnServices.map((service) => service.name).join(', ') || 'none'}`,
+          notes: `${formData.notes ? `${formData.notes} | ` : ''}${specialOffer.title} booking with add-ons: ${selectedAddOnServices.map((service) => service.name).join(', ') || 'none'}`,
         }),
       });
 
@@ -269,17 +319,17 @@ export default function SpecialBookingContent() {
       <ThankYouOverlay
         open={submitted}
         title="Thank you for booking"
-        message="Your summer special request was submitted successfully. We’re sending you back home now."
+        message={`Your ${specialOffer.title.toLowerCase()} request was submitted successfully. We’re sending you back home now.`}
       />
 
       <div className="max-w-5xl mx-auto">
         <div className="surface-card p-6 sm:p-8 mb-8 appear-up">
           <p className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-amber-900">
-            Summer Special Booking
+            {specialOffer.badgeLabel}
           </p>
-          <h1 className="mt-4 text-4xl sm:text-5xl font-bold text-slate-900">Premium Summer Cleanup</h1>
+          <h1 className="mt-4 text-4xl sm:text-5xl font-bold text-slate-900">{specialOffer.title}</h1>
           <p className="mt-3 text-slate-700 max-w-3xl">
-            $200 flat for standard residential lots up to 1/4 acre. Add extra services below at normal prices.
+            {specialOffer.intro}
           </p>
         </div>
 
@@ -295,22 +345,16 @@ export default function SpecialBookingContent() {
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="surface-card p-8 appear-up">
             <h2 className="text-2xl font-bold text-slate-900 mb-4">1. Special Package Included</h2>
-            <p className="text-slate-700 mb-5">Included in the flat $200 price:</p>
+            <p className="text-slate-700 mb-5">{specialOffer.includesHeader}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                'Dog poop pickup',
-                'Lawn mowing',
-                'Weed whacking',
-                'Hedge trimming',
-                'Gutter cleaning',
-              ].map((item) => (
+              {specialOffer.includedLabels.map((item) => (
                 <div key={item} className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
                   {item}
                 </div>
               ))}
             </div>
             <p className="mt-5 text-sm text-slate-700 leading-6">
-              Severely overgrown hedges or larger properties may require a custom quote upon arrival.
+              {specialOffer.note}
             </p>
           </div>
 
@@ -331,7 +375,7 @@ export default function SpecialBookingContent() {
               })}
             </div>
             <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              Base special: ${SPECIAL_BASE_PRICE}. Add-ons total: ${addOnTotal.toFixed(2)}. Total: ${totalPrice.toFixed(2)}.
+              Base special: ${specialOffer.price}. Add-ons total: ${addOnTotal.toFixed(2)}. Total: ${totalPrice.toFixed(2)}.
             </div>
           </div>
 

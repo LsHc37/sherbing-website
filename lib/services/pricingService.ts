@@ -115,9 +115,9 @@ export const SERVICE_PRICING: Record<string, PricingRule> = {
   pressure_washing: { 
     name: 'Pressure Washing', 
     pricePerSqft: 0.30, 
-    minimumPrice: 150,
+    minimumPrice: 200,
     areaBasis: 'property',
-    description: 'Professional pressure washing for home exteriors with three service tiers—Basic, Standard, and Premium Soft Wash. We use your water.',
+    description: 'Driveway and sidewalk pressure washing. Driveways: $175-$250. Sidewalks: $25-$50. We use the customer\'s water supply.',
     images: ['/services/pressure-washing-1.jpg']
   },
 };

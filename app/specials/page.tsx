@@ -45,6 +45,18 @@ const specials = [
     note: 'A simple seasonal option for keeping the yard clean and under control.',
     cta: '/booking?service=lawn_mowing',
   },
+  {
+    title: 'Pressure Washing Special',
+    price: '$150',
+    subtitle: 'For properties up to 1/4 acre',
+    details: [
+      'Driveway pressure washing included',
+      'Sidewalk pressure washing included',
+      'Same 1/4-acre eligibility check rules',
+    ],
+    note: 'Flat $150 when the property qualifies at 1/4 acre or less. Larger properties will receive a custom quote.',
+    cta: '/special-booking?offer=pressure-washing',
+  },
 ];
 
 export default function SpecialsPage() {
