@@ -6,7 +6,7 @@ export default function AdminLoginPage() {
       title="Admin Sign In"
       subtitle="Access admin tools, user management, and job application review"
       allowedRoles={['admin']}
-      redirectByRole={{ admin: '/admin/users' }}
+      redirectByRole={{ admin: '/admin' }}
       footerLinks={[
         { href: '/employee/login', label: 'Employee Login' },
         { href: '/login', label: 'Customer Login' },
