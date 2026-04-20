@@ -148,9 +148,11 @@ async function streamLargeStorageFile(req, res) {
 	createReadStream(absolutePath, { start, end }).pipe(res);
 }
 
+// Protect admin pages before the generic public host can serve them.
+app.use("/admin", requireLucasAuth, express.static(join(process.cwd(), "public", "admin")));
+
 // Load our publicPath first and prioritize it over UV.
 app.use(express.static("./public"));
-app.use("/admin", requireLucasAuth, express.static(join(process.cwd(), "public", "admin")));
 
 // Gate game assets and v86 artifacts behind admin auth.
 app.use("/storage", requireLucasAuth);

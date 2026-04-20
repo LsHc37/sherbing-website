@@ -15,17 +15,100 @@
         min-height: 100vh;
         display: grid;
         place-items: center;
-        background: radial-gradient(circle at top right, #d3e9ff, #f4f8ff 45%, #eef3fa 100%);
+        background:
+          radial-gradient(circle at top right, #d3e9ff, #f4f8ff 45%, #eef3fa 100%),
+          linear-gradient(135deg, #f7fbff 0%, #e8f1fb 100%);
         color: #1f2a37;
       }
 
       main {
-        width: min(780px, 92vw);
+        width: min(920px, 94vw);
         background: #ffffff;
         border: 1px solid #d9e3f0;
+        border-radius: 20px;
+        padding: 32px;
+        box-shadow: 0 20px 60px rgba(30, 58, 95, 0.12);
+      }
+
+      .hero {
+        display: grid;
+        gap: 10px;
+        padding-bottom: 20px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid #e4ebf3;
+      }
+
+      .eyebrow {
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.75rem;
+        color: #5b728a;
+        font-weight: 700;
+      }
+
+      .headline {
+        margin: 0;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1.05;
+      }
+
+      .lead {
+        margin: 0;
+        max-width: 70ch;
+        color: #43556b;
+        font-size: 1rem;
+        line-height: 1.7;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 18px;
+      }
+
+      .card {
+        border: 1px solid #dde7f2;
         border-radius: 16px;
-        padding: 28px;
-        box-shadow: 0 18px 40px rgba(30, 58, 95, 0.1);
+        padding: 18px;
+        background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+      }
+
+      .card h2 {
+        margin: 0 0 8px;
+        font-size: 1.05rem;
+      }
+
+      .card p,
+      .card li {
+        color: #42556b;
+        line-height: 1.65;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: #0a66c2;
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 700;
+      }
+
+      .button.secondary {
+        background: #eef4fb;
+        color: #1f2a37;
+        border: 1px solid #d6e2ef;
       }
 
       h1 {
@@ -40,30 +123,55 @@
 
       ul {
         line-height: 1.8;
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      .full-width {
+        grid-column: 1 / -1;
       }
     </style>
   </head>
   <body>
     <main>
-      <h1>Sherbing Admin Portal</h1>
-      <p>
-        This route is protected with HTTP Basic Auth. Unrestricted tools are only available
-        after authenticating as <code>lucas</code>.
-      </p>
+      <div class="hero">
+        <p class="eyebrow">Sherbing Admin Portal</p>
+        <h1 class="headline">Operational dashboard for restricted tools</h1>
+        <p class="lead">
+          This area is protected with HTTP Basic Auth. Use it to launch the unrestricted browser,
+          manage emulator sessions, and access the proxy endpoints that are only available to
+          authenticated admin users.
+        </p>
+      </div>
 
-      <h2>Protected Proxy Paths</h2>
-      <ul>
-        <li><code>/uv/</code></li>
-        <li><code>/epoxy/</code></li>
-        <li><code>/baremux/</code></li>
-        <li><code>/wisp/</code> (WebSocket upgrade route)</li>
-      </ul>
+      <div class="grid">
+        <section class="card">
+          <h2>Open Tools</h2>
+          <div class="actions">
+            <a class="button" href="/admin/admin-browser.html">Unrestricted Browser</a>
+            <a class="button secondary" href="/admin/admin-games.html">Retro Games</a>
+          </div>
+        </section>
 
-      <h2>Admin Tools</h2>
-      <ul>
-        <li><a href="/admin/admin-browser.html">Unrestricted Browser Dashboard</a></li>
-        <li><a href="/admin/admin-games.html">Retro Games (v86)</a></li>
-      </ul>
+        <section class="card">
+          <h2>Protected Proxy Paths</h2>
+          <ul>
+            <li><code>/uv/</code></li>
+            <li><code>/epoxy/</code></li>
+            <li><code>/baremux/</code></li>
+            <li><code>/wisp/</code> (WebSocket upgrade route)</li>
+          </ul>
+        </section>
+
+        <section class="card full-width">
+          <h2>Access Notes</h2>
+          <p>
+            If the page still looks empty, make sure you are signed in with the admin credential
+            and open <code>/admin/index.html</code> directly. The browser will cache Basic Auth
+            credentials per origin, so one login should unlock the full dashboard.
+          </p>
+        </section>
+      </div>
     </main>
   </body>
 </html>
