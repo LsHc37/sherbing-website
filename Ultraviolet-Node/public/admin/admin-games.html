@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sherbing Admin | Retro Games</title>
+    <style>
+      :root {
+        --ink: #e7edf5;
+        --muted: #9fb0c3;
+        --line: #244160;
+        --bg0: #081422;
+        --bg1: #0e2338;
+        --panel: rgba(8, 24, 38, 0.88);
+        --good: #2cc08b;
+        --action: #3e8bff;
+        --action-hover: #2e6fce;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(1100px 500px at 12% -8%, #22496f 0%, transparent 60%),
+          radial-gradient(800px 500px at 88% 108%, #173454 0%, transparent 60%),
+          linear-gradient(165deg, var(--bg0), var(--bg1));
+      }
+
+      .dashboard {
+        min-height: 100vh;
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        gap: 12px;
+        padding: 14px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        backdrop-filter: blur(4px);
+      }
+
+      .header {
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 1.05rem;
+      }
+
+      .subtitle {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .status {
+        color: var(--good);
+        font-size: 0.9rem;
+        text-align: right;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px;
+      }
+
+      button {
+        border: 1px solid #2f5a87;
+        border-radius: 9px;
+        background: #122a42;
+        color: var(--ink);
+        font-weight: 600;
+        cursor: pointer;
+        padding: 10px 12px;
+      }
+
+      button.primary {
+        background: var(--action);
+        border-color: #5a9dff;
+      }
+
+      button:hover {
+        background: var(--action-hover);
+      }
+
+      .viewer {
+        overflow: hidden;
+        min-height: 0;
+        padding: 10px;
+      }
+
+      #screen {
+        width: 100%;
+        height: 100%;
+        min-height: 64vh;
+        border-radius: 10px;
+        border: 1px solid #2f5277;
+        background: #000;
+        overflow: hidden;
+      }
+
+      #screen canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      @media (max-width: 900px) {
+        #screen {
+          min-height: 72vh;
+        }
+      }
+    </style>
+    <script src="/storage/v86/libv86.js"></script>
+  </head>
+  <body>
+    <div class="dashboard">
+      <section class="panel header">
+        <div>
+          <h1 class="title">Retro Games | Halo: Combat Evolved (2003)</h1>
+          <p class="subtitle">v86 WebAssembly boot profile for a Windows 95/98 style environment.</p>
+        </div>
+        <div id="status" class="status">Waiting to start...</div>
+      </section>
+
+      <section class="panel controls">
+        <button id="startBtn" class="primary" type="button">Start VM</button>
+        <button id="pauseBtn" type="button">Pause</button>
+        <button id="resetBtn" type="button">Reset</button>
+        <button id="fullscreenBtn" type="button">Fullscreen</button>
+      </section>
+
+      <section class="panel viewer">
+        <div id="screen"></div>
+      </section>
+    </div>
+
+    <script>
+      "use strict";
+
+      let emulator = null;
+      let isRunning = false;
+
+      const statusEl = document.getElementById("status");
+      const screenEl = document.getElementById("screen");
+      const startBtn = document.getElementById("startBtn");
+      const pauseBtn = document.getElementById("pauseBtn");
+      const resetBtn = document.getElementById("resetBtn");
+      const fullscreenBtn = document.getElementById("fullscreenBtn");
+
+      function setStatus(message) {
+        statusEl.textContent = message;
+      }
+
+      function buildV86Config() {
+        return {
+          wasm_path: "/storage/v86/v86.wasm",
+          memory_size: 512 * 1024 * 1024,
+          vga_memory_size: 16 * 1024 * 1024,
+          screen_container: screenEl,
+          bios: { url: "/storage/bios/seabios.bin" },
+          vga_bios: { url: "/storage/bios/vgabios.bin" },
+          hda: {
+            url: "/storage/images/win98-halo.img",
+            async: true,
+          },
+          autostart: true,
+        };
+      }
+
+      function ensureEmulator() {
+        if (emulator) {
+          return emulator;
+        }
+
+        emulator = new V86Starter(buildV86Config());
+        isRunning = true;
+
+        emulator.add_listener("emulator-ready", () => {
+          setStatus("VM ready. Boot sequence started.");
+        });
+
+        emulator.add_listener("download-progress", (event) => {
+          if (!event || !event.file_name) {
+            return;
+          }
+          const loaded = Number(event.loaded || 0);
+          const total = Number(event.total || 0);
+          const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+          setStatus(`Loading ${event.file_name}: ${percent}%`);
+        });
+
+        return emulator;
+      }
+
+      startBtn.addEventListener("click", () => {
+        const vm = ensureEmulator();
+        vm.run();
+        isRunning = true;
+        setStatus("VM running.");
+      });
+
+      pauseBtn.addEventListener("click", () => {
+        const vm = ensureEmulator();
+        if (isRunning) {
+          vm.stop();
+          isRunning = false;
+          setStatus("VM paused.");
+          pauseBtn.textContent = "Resume";
+          return;
+        }
+
+        vm.run();
+        isRunning = true;
+        pauseBtn.textContent = "Pause";
+        setStatus("VM resumed.");
+      });
+
+      resetBtn.addEventListener("click", () => {
+        const vm = ensureEmulator();
+        vm.restart();
+        isRunning = true;
+        pauseBtn.textContent = "Pause";
+        setStatus("VM restarted.");
+      });
+
+      fullscreenBtn.addEventListener("click", () => {
+        if (!document.fullscreenElement) {
+          screenEl.requestFullscreen().catch(() => {
+            setStatus("Fullscreen was blocked by the browser.");
+          });
+          return;
+        }
+
+        document.exitFullscreen();
+      });
+    </script>
+  </body>
+</html>

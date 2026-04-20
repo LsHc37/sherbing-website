@@ -16,6 +16,9 @@
 # next.js
 /.next/
 /out/
+Ultraviolet-Node/node_modules
+Ultraviolet-Node/.next
+Ultraviolet-Node/out
 
 # production
 /build
