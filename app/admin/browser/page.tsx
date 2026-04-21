@@ -170,9 +170,9 @@ export default function AdminBrowserPage() {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.15),_transparent_40%),linear-gradient(180deg,#020617_0%,#0f172a_100%)] text-white px-4 py-4 sm:px-6 lg:px-8">
-      <Script src="/baremux/worker.js" strategy="beforeInteractive" />
-      <Script src="/uv/uv.bundle.js" strategy="beforeInteractive" />
-      <Script src="/uv/uv.config.js" strategy="beforeInteractive" />
+      <Script src="/baremux/index.js" strategy="afterInteractive" />
+      <Script src="/uv/uv.bundle.js" strategy="afterInteractive" />
+      <Script src="/uv/uv.config.js" strategy="afterInteractive" />
 
       <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-7xl flex-col gap-4">
         <header className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4 shadow-2xl shadow-slate-950/40 backdrop-blur sm:px-6">
